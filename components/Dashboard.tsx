@@ -189,16 +189,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   return (
     <div className="space-y-6 animate-fadeIn pb-8">
       {/* 1. Inspiração do Dia (TOPO) */}
-      <div className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] rounded-xl p-6 text-black shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-                <h2 className="text-black/60 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Quote size={16} className="fill-black/40 text-black/40" />Inspiração do Dia
+                <h2 className="text-blue-100 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Quote size={16} className="fill-blue-200 text-blue-200" />Inspiração do Dia
                 </h2>
-                <p className="text-xl md:text-2xl font-serif font-bold italic leading-relaxed text-black/90">"{todaysVerse.text}"</p>
-                <p className="mt-2 text-black/70 text-sm font-semibold">— {todaysVerse.reference}</p>
+                <p className="text-xl md:text-2xl font-serif font-bold italic leading-relaxed text-white">"{todaysVerse.text}"</p>
+                <p className="mt-2 text-blue-100 text-sm font-semibold">— {todaysVerse.reference}</p>
             </div>
-            <div className="hidden md:block opacity-10 transform rotate-12 text-black/20"><Briefcase size={80} /></div>
+            <div className="hidden md:block opacity-20 transform rotate-12 text-white"><Briefcase size={80} /></div>
         </div>
       </div>
 
@@ -221,7 +221,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                 </h3>
                 <button 
                     onClick={openRecentDetails}
-                    className="p-1.5 text-slate-400 hover:text-[#FF00FF] hover:bg-slate-100 rounded-md transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"
                     title="Ver Detalhes"
                 >
                     <List size={18} />
@@ -245,7 +245,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                         <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value: number) => [formatCurrency(value), 'Receita']} />
                         <Bar 
                             dataKey="revenue" 
-                            fill="#22c55e" 
+                            fill="#2563eb" 
                             radius={[4, 4, 0, 0]} 
                             barSize={30} 
                             cursor="pointer"
@@ -292,16 +292,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
         {/* Coluna 3: Tarefas de Hoje */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><CheckSquare size={20} className="text-[#FF00FF]"/>Tarefas de Hoje</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><CheckSquare size={20} className="text-blue-600"/>Tarefas de Hoje</h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                 {todaysTasks.length > 0 ? (
                     todaysTasks.map(task => {
                         const projectName = getProjectName(task.projectId);
                         return (
-                            <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-[#FCD282]'}`}>
+                            <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-400'}`}>
                                 <button 
                                     onClick={() => onToggleTask(task.id, !task.isCompleted)}
-                                    className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-[#FF00FF]'}`}
+                                    className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}
                                 >
                                     {task.isCompleted && <Check size={12} strokeWidth={3} />}
                                 </button>
@@ -337,7 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                     })
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg p-4 text-center">
-                        <Calendar size={24} className="mb-2 opacity-50 text-[#FF00FF]"/>
+                        <Calendar size={24} className="mb-2 opacity-50 text-blue-500"/>
                         <p>Nenhuma tarefa para hoje.</p>
                     </div>
                 )}
@@ -364,7 +364,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <FileText size={20} className="text-[#FF00FF]"/> 
+                        <FileText size={20} className="text-blue-600"/> 
                         Detalhamento de Receita
                     </h3>
                     <p className="text-sm text-slate-500">

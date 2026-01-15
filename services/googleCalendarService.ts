@@ -8,7 +8,6 @@ declare global {
 }
 
 // CORREÇÃO DEFINITIVA: Usando import.meta.env (Padrão Vite)
-// O TypeScript pode reclamar no editor se não houver types, mas isso é o correto para build Vite/Vercel.
 const API_KEY = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
 const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '';
 
@@ -43,11 +42,12 @@ class GoogleCalendarService {
   // Inicializa o cliente GAPI
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // Log de diagnóstico crítico
+      // VERIFICAÇÃO DE SEGURANÇA:
+      // Se não houver chaves (ambiente de desenvolvimento/editor), não tenta carregar o GAPI.
+      // Isso evita a tela branca ou erros de script.
       if (!API_KEY || !CLIENT_ID) {
-        console.error('ERRO CRÍTICO: Chaves do Google (VITE_GOOGLE_API_KEY ou VITE_GOOGLE_CLIENT_ID) estão undefined/vazias.');
-        console.error('Verifique seu arquivo .env.local ou as Variáveis de Ambiente na Vercel.');
-        resolve(); // Resolve para não travar a aplicação inteira, mas funcionalidades falharão
+        console.warn('Google Calendar: Chaves de API não detectadas. O serviço funcionará em modo offline/demonstração.');
+        resolve(); 
         return;
       }
 
@@ -72,11 +72,14 @@ class GoogleCalendarService {
             resolve();
           } catch (error) {
             console.error('Error initializing GAPI client', error);
-            reject(error);
+            // Resolvemos mesmo com erro para não travar a UI, apenas a funcionalidade de calendário falhará
+            resolve();
           }
         });
       } else {
-        reject('Google API script not loaded');
+        // Se o script não carregou (ex: bloqueador de anúncios ou falha de rede), resolvemos para não travar o app
+        console.warn('Google API script not loaded');
+        resolve();
       }
     });
   };
@@ -85,7 +88,9 @@ class GoogleCalendarService {
   handleAuthClick = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!this.tokenClient) {
-        reject('Token client not initialized. Verifique o console para erros de API KEY.');
+        // Em vez de rejeitar com erro fatal, apenas alertamos
+        console.warn('Token client not initialized. Verifique as chaves de API.');
+        reject('Integração com Google não configurada.');
         return;
       }
 
@@ -106,6 +111,7 @@ class GoogleCalendarService {
 
   // Logout
   handleSignoutClick = () => {
+    if (!window.gapi || !window.gapi.client) return;
     const token = window.gapi.client.getToken();
     if (token !== null) {
       window.google.accounts.oauth2.revoke(token.access_token);

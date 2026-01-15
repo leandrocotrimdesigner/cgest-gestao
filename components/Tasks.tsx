@@ -181,7 +181,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     }
   };
 
-  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none";
+  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none";
 
   return (
     <div className="space-y-6">
@@ -192,20 +192,20 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 sticky top-4">
-            <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={18} className="text-[#FF00FF]" />Nova Tarefa</h3>
+            <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={18} className="text-blue-600" />Nova Tarefa</h3>
             <form onSubmit={handleAddTask} className="space-y-4">
-              <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Descrição</label><textarea required rows={3} value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-[#FF00FF]" placeholder="Fazer..." /></div>
+              <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Descrição</label><textarea required rows={3} value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-blue-500" placeholder="Fazer..." /></div>
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Prazo</label><DateSelector value={dueDate} onChange={setDueDate} /></div>
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Projeto</label><select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className={inputClass}><option value="">Nenhum</option>{projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select></div>
               
               {/* Meeting Toggle */}
               <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700 flex items-center gap-2"><Video size={16} className={isMeeting ? "text-[#FF00FF]" : "text-slate-400"} /> Reunião</span>
+                      <span className="text-sm font-medium text-slate-700 flex items-center gap-2"><Video size={16} className={isMeeting ? "text-blue-600" : "text-slate-400"} /> Reunião</span>
                       <button 
                         type="button" 
                         onClick={() => setIsMeeting(!isMeeting)} 
-                        className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${isMeeting ? 'bg-[#FF00FF]' : 'bg-slate-200'}`}
+                        className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${isMeeting ? 'bg-blue-600' : 'bg-slate-200'}`}
                       >
                           <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${isMeeting ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
@@ -225,7 +225,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                   )}
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold rounded-lg shadow-md transition-all active:scale-95">Adicionar</button>
+              <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95">Adicionar</button>
             </form>
           </div>
         </div>
@@ -284,7 +284,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                         return (
                         <div key={task.id} className={`bg-white p-4 rounded-xl border flex items-start gap-4 group hover:shadow-md transition-all ${task.isCompleted ? 'border-slate-100 opacity-60' : 'border-slate-200'} relative`}>
                             {/* Checkbox or Meeting Icon Area */}
-                            <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : (isMeetingTask ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-300 hover:border-[#FF00FF]')}`}>
+                            <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : (isMeetingTask ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-300 hover:border-blue-500')}`}>
                                 {task.isCompleted ? <Check size={14} strokeWidth={3} /> : (isMeetingTask ? <Video size={12} /> : null)}
                             </button>
                             

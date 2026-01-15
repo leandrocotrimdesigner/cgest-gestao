@@ -51,13 +51,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
         <div className="flex flex-col flex-1 overflow-hidden">
             {/* LOGO AREA */}
             <div className="p-6 border-b border-white/10 flex justify-between items-center flex-shrink-0">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-full md:w-auto md:justify-start">
                  <img 
-                    src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/layout-dashboard.svg" 
+                    src="/logo-cgest.png" 
                     alt="CGest Logo" 
-                    className="h-10 w-auto object-contain invert brightness-0"
+                    className="h-10 w-auto object-contain"
                  />
-                 <span className="font-bold text-xl tracking-tight text-white">CGest</span>
               </div>
               <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-white hover:bg-white/10 rounded p-1 transition-colors">
                 <X size={24} />
@@ -72,11 +71,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
                   onClick={() => handleNav(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     activeTab === item.id 
-                      ? 'bg-gradient-to-r from-[#FF00FF] to-[#FCD282] text-black shadow-lg translate-x-1 font-bold' 
-                      : 'text-white hover:bg-white/10 hover:translate-x-1'
+                      ? 'bg-blue-600 text-white shadow-lg translate-x-1 font-bold' 
+                      : 'text-white/80 hover:bg-white/10 hover:text-white hover:translate-x-1'
                   }`}
                 >
-                  <item.icon size={20} className={activeTab === item.id ? 'text-black' : 'opacity-80'} />
+                  <item.icon size={20} className={activeTab === item.id ? 'text-white' : 'opacity-70 group-hover:opacity-100'} />
                   <span className="font-medium">{item.label}</span>
                 </button>
               ))}

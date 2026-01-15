@@ -128,7 +128,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
       }
   };
 
-  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none";
+  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none";
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-4xl mx-auto">
@@ -162,7 +162,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                     <Camera className="text-white" size={24} />
                 </div>
                 
-                <div className="absolute bottom-0 right-0 bg-[#FF00FF] text-white p-1.5 rounded-full shadow-md border-2 border-white group-hover:bg-[#d100d1] transition-colors z-30 pointer-events-none">
+                <div className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full shadow-md border-2 border-white group-hover:bg-blue-700 transition-colors z-30 pointer-events-none">
                     <Camera size={14} />
                 </div>
             </div>
@@ -174,7 +174,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                Conta Administrador
             </div>
             
-            <div className="mt-4 text-sm text-[#FF00FF] font-medium hover:underline cursor-pointer relative">
+            <div className="mt-4 text-sm text-blue-600 font-medium hover:underline cursor-pointer relative">
                 Alterar Foto
                  <input 
                     type="file" 
@@ -189,7 +189,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
         <div className="md:col-span-2 space-y-6">
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 space-y-6">
             <div className="space-y-4">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2"><UserIcon size={18} className="text-[#FF00FF]" />Dados Pessoais</h4>
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2"><UserIcon size={18} className="text-blue-600" />Dados Pessoais</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
@@ -210,7 +210,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <div className="space-y-4 pt-2">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2"><Lock size={18} className="text-[#FF00FF]" />Alterar Senha</h4>
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2"><Lock size={18} className="text-blue-600" />Alterar Senha</h4>
                 <div className="space-y-3">
                     <div><label className="block text-sm font-medium text-slate-700 mb-1">Senha Atual</label><input type="password" name="currentPassword" value={formData.currentPassword} onChange={handleChange} className={inputClass} /></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -221,7 +221,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <div className="pt-4 flex justify-end">
-                <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black px-6 py-2.5 rounded-lg font-bold transition-all shadow-md active:scale-95 disabled:opacity-70">
+                <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold transition-all shadow-md active:scale-95 disabled:opacity-70">
                     <Save size={18} /> {isLoading ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
             </div>
