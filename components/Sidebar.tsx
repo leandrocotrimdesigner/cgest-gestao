@@ -51,14 +51,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
         <div className="flex flex-col flex-1 overflow-hidden">
             {/* LOGO AREA */}
             <div className="p-6 border-b border-slate-800 flex justify-between items-center flex-shrink-0">
+              {/* Logo substitui o texto anterior */}
               <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <span className="text-white font-bold text-xl font-sans leading-none">C</span>
-                 </div>
-                 
-                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">
-                   CGest
-                 </h1>
+                 {/* 
+                    SUBSTITUA O SRC ABAIXO PELA URL DA SUA IMAGEM.
+                    Exemplo: src="/logo.png" ou uma URL externa.
+                 */}
+                 <img 
+                    src="https://placehold.co/180x50/0f172a/3b82f6?text=CGest+Logo&font=montserrat" 
+                    alt="CGest Logo Oficial" 
+                    className="h-10 w-auto object-contain"
+                 />
               </div>
               <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
                 <X size={24} />

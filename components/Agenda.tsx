@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, RefreshCw, LogOut } from 'lucide-react';
 import { googleCalendarService, GoogleEvent } from '../services/googleCalendarService';
@@ -18,8 +19,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-declare const process: any;
-
 const Agenda: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<GoogleEvent[]>([]);
@@ -28,8 +27,13 @@ const Agenda: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   useEffect(() => {
-    // Debug log solicitado para verificar a chave na Vercel
-    console.log('Client ID carregado:', process.env.VITE_GOOGLE_CLIENT_ID);
+    // Debug log solicitado para verificar a chave na Vercel usando process.env
+    const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
+    console.log('Client ID carregado (Agenda):', clientId);
+    
+    if (!clientId) {
+        console.warn('VITE_GOOGLE_CLIENT_ID está undefined no componente Agenda.');
+    }
 
     const init = async () => {
       try {

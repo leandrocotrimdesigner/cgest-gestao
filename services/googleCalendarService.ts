@@ -1,4 +1,5 @@
 
+
 // Declaração de tipos globais para as bibliotecas do Google carregadas via CDN
 declare global {
   interface Window {
@@ -7,9 +8,7 @@ declare global {
   }
 }
 
-declare const process: any;
-
-// Reverting to process.env as import.meta.env was causing runtime errors in this environment
+// Usando process.env (compatibilidade com env do projeto)
 const API_KEY = process.env.VITE_GOOGLE_API_KEY || '';
 const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
 
@@ -47,8 +46,16 @@ class GoogleCalendarService {
   // Inicializa o cliente GAPI
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
+      // Verificação de segurança e aviso no console
+      if (!API_KEY) {
+        console.warn('AVISO CRÍTICO: VITE_GOOGLE_API_KEY não foi encontrada nas variáveis de ambiente (process.env).');
+      }
+      if (!CLIENT_ID) {
+        console.warn('AVISO CRÍTICO: VITE_GOOGLE_CLIENT_ID não foi encontrada nas variáveis de ambiente (process.env).');
+      }
+
       if (!API_KEY || !CLIENT_ID) {
-        console.warn('Google API Key or Client ID missing in env');
+        console.warn('Google Calendar Service não pode ser inicializado sem as chaves.');
         resolve(); 
         return;
       }
