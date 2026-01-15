@@ -53,9 +53,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
             <div className="p-6 border-b border-white/10 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center justify-center w-full md:w-auto md:justify-start">
                  <img 
-                    src="/logo-cgest.png" 
+                    src="https://lh3.googleusercontent.com/d/1As39kdJ3X61IEs7YpZYPZlmRg-CBitIA" 
                     alt="CGest Logo" 
-                    className="h-10 w-auto object-contain"
+                    className="h-12 w-auto object-contain"
                  />
               </div>
               <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-white hover:bg-white/10 rounded p-1 transition-colors">
