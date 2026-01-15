@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Task, Project } from '../types';
 import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2 } from 'lucide-react';
 import { DateSelector } from './DateSelector';
+import { googleCalendarService } from '../services/googleCalendarService';
 
 interface TasksProps {
   tasks: Task[];
@@ -47,10 +48,16 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
   // Optimistic UI
   const displayedTasks = tasks.filter(t => !deletedIds.has(t.id));
 
+  const getProjectName = (id?: string) => {
+    if (!id) return null;
+    return projects.find(p => p.id === id)?.name;
+  };
+
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     
+    // 1. Criar a Tarefa no Sistema
     await onAddTask({
       title: newTaskTitle,
       isCompleted: false,
@@ -59,6 +66,35 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
       isMeeting: isMeeting,
       meetingTime: isMeeting ? meetingTime : undefined
     });
+
+    // 2. Integração com Google Agenda
+    if (isMeeting && dueDate && meetingTime) {
+      if (googleCalendarService.isAuthenticated()) {
+        try {
+           const startDateStr = `${dueDate}T${meetingTime}:00`;
+           const start = new Date(startDateStr);
+           // Define duração padrão de 1 hora
+           const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+           const projectName = getProjectName(selectedProjectId);
+           const description = projectName ? `Projeto: ${projectName}` : 'Tarefa criada via CGest';
+
+           await googleCalendarService.createEvent({
+             summary: newTaskTitle,
+             description: description,
+             start: start.toISOString(),
+             end: end.toISOString()
+           });
+           
+           alert("Reunião agendada no Google Calendar com sucesso!");
+        } catch (error) {
+           console.error("Erro ao sincronizar com Google:", error);
+           alert("A tarefa foi criada, mas houve um erro ao sincronizar com a Agenda Google. Verifique se você concedeu as permissões necessárias.");
+        }
+      } else {
+        alert("A tarefa foi criada, mas não foi possível sincronizar com a Agenda. Por favor, conecte-se ao Google na aba 'Agenda'.");
+      }
+    }
     
     // Reset form
     setNewTaskTitle('');
@@ -112,11 +148,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
           });
           setUndoTask(null);
       }
-  };
-
-  const getProjectName = (id?: string) => {
-    if (!id) return null;
-    return projects.find(p => p.id === id)?.name;
   };
 
   const getTaskGroup = (task: Task) => {

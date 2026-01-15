@@ -18,6 +18,8 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+declare const process: any;
+
 const Agenda: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<GoogleEvent[]>([]);
@@ -27,7 +29,7 @@ const Agenda: React.FC = () => {
 
   useEffect(() => {
     // Debug log solicitado para verificar a chave na Vercel
-    console.log('Client ID carregado:', (import.meta as any).env.VITE_GOOGLE_CLIENT_ID);
+    console.log('Client ID carregado:', process.env.VITE_GOOGLE_CLIENT_ID);
 
     const init = async () => {
       try {

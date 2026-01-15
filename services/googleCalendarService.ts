@@ -7,12 +7,17 @@ declare global {
   }
 }
 
-// Usando import.meta.env (Padrão Vite) para garantir leitura correta na Vercel
-const API_KEY = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
-const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '';
+declare const process: any;
+
+// Reverting to process.env as import.meta.env was causing runtime errors in this environment
+const API_KEY = process.env.VITE_GOOGLE_API_KEY || '';
+const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
+
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
-// Atualizado para incluir o escopo mais amplo de leitura
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly';
+
+// ATUALIZADO: Removido .readonly para permitir criação de eventos
+// Adicionado escopo 'https://www.googleapis.com/auth/calendar.events' para gerenciar eventos
+const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
 
 export interface GoogleEvent {
   id: string;
@@ -22,6 +27,13 @@ export interface GoogleEvent {
   end: { dateTime?: string; date?: string };
   htmlLink: string;
   location?: string;
+}
+
+export interface CreateEventDTO {
+  summary: string;
+  description?: string;
+  start: string; // ISO String
+  end: string;   // ISO String
 }
 
 class GoogleCalendarService {
@@ -88,8 +100,6 @@ class GoogleCalendarService {
       };
 
       // GIS (google.accounts.oauth2) usa popup por padrão.
-      // gapi.auth2.getAuthInstance() não é mais usado com este fluxo.
-      // Verificamos se há token válido via gapi.client
       if (window.gapi.client.getToken() === null) {
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
       } else {
@@ -129,6 +139,37 @@ class GoogleCalendarService {
       return response.result.items;
     } catch (err) {
       console.error('Error fetching events', err);
+      throw err;
+    }
+  };
+
+  // NOVO: Cria evento na agenda
+  createEvent = async (eventData: CreateEventDTO): Promise<any> => {
+    if (!this.isGapiInitialized || !this.isAuthenticated()) {
+      throw new Error("Usuário não autenticado no Google Calendar");
+    }
+
+    const event = {
+      'summary': eventData.summary,
+      'description': eventData.description,
+      'start': {
+        'dateTime': eventData.start,
+        'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
+      },
+      'end': {
+        'dateTime': eventData.end,
+        'timeZone': Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
+    };
+
+    try {
+      const request = await window.gapi.client.calendar.events.insert({
+        'calendarId': 'primary',
+        'resource': event
+      });
+      return request;
+    } catch (err) {
+      console.error('Error creating event', err);
       throw err;
     }
   };
