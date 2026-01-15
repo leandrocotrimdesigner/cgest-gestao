@@ -225,7 +225,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   };
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none";
+  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none";
 
   return (
     <div className="space-y-6">
@@ -234,7 +234,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
           <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
           <p className="text-slate-500">Gerencie sua base e controle financeiro</p>
         </div>
-        <button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+        <button onClick={handleOpenAdd} className="bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
           <Plus size={20} /> Novo Cliente
         </button>
       </div>
@@ -243,14 +243,14 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row gap-4 justify-between items-center">
           <div className="relative w-full md:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input type="text" placeholder="Buscar clientes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"/>
+            <input type="text" placeholder="Buscar clientes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none shadow-sm"/>
           </div>
           <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
              {(['all', 'active', 'inactive'] as const).map(status => (
                  <button
                     key={status}
                     onClick={() => setStatusFilter(status)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === status ? 'bg-white text-[#FF00FF] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                     {status === 'all' ? 'Todos' : status === 'active' ? 'Ativos' : 'Inativos'}
                  </button>
@@ -301,11 +301,11 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                         </td>
                         <td className="px-6 py-4 text-right relative">
                             <div className="flex items-center justify-end gap-2">
-                                <button type="button" onClick={(e) => handleOpenFinancial(e, client)} className="text-blue-600 hover:text-blue-800 bg-blue-50 p-1.5 rounded-md"><DollarSign size={18} /></button>
+                                <button type="button" onClick={(e) => handleOpenFinancial(e, client)} className="text-[#FF00FF] hover:text-[#d100d1] bg-purple-50 p-1.5 rounded-md"><DollarSign size={18} /></button>
                                 <button 
                                     type="button"
                                     onClick={(e) => handleOpenEdit(e, client)}
-                                    className="text-slate-500 hover:text-blue-600 hover:bg-slate-100 p-1.5 rounded-md transition-colors"
+                                    className="text-slate-500 hover:text-[#FF00FF] hover:bg-slate-100 p-1.5 rounded-md transition-colors"
                                 >
                                     <Edit2 size={18} />
                                 </button>
@@ -387,7 +387,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                   <div><label className="block text-sm font-medium text-slate-700 mb-1">Dia Vencimento</label><input type="number" value={formData.dueDay || ''} onChange={e => setFormData({...formData, dueDay: parseInt(e.target.value)})} className={inputClass} /></div>
                 </div>
               )}
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Salvar</button></div>
+              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black rounded-lg font-bold">Salvar</button></div>
             </form>
           </div>
         </div>
@@ -415,7 +415,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         placeholder="Ex: Mensalidade, Serviço Extra" 
                                         value={newPaymentData.description} 
                                         onChange={e => setNewPaymentData({...newPaymentData, description: e.target.value})} 
-                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
+                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#FF00FF] placeholder-slate-400" 
                                     />
                                 </div>
                                 <div>
@@ -426,7 +426,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         placeholder="0,00" 
                                         value={newPaymentData.value || ''} 
                                         onChange={e => setNewPaymentData({...newPaymentData, value: parseFloat(e.target.value)})} 
-                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
+                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#FF00FF] placeholder-slate-400" 
                                     />
                                 </div>
                             </div>
@@ -438,7 +438,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         <select 
                                             value={newPaymentData.month} 
                                             onChange={e => setNewPaymentData({...newPaymentData, month: e.target.value})}
-                                            className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#FF00FF]"
                                         >
                                             {fullMonths.map((m, i) => (
                                                 <option key={i} value={i}>{m}</option>
@@ -449,7 +449,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-md transition-colors h-[42px]">
+                                <button type="submit" className="px-6 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black rounded-lg font-bold shadow-md transition-colors h-[42px]">
                                     Adicionar
                                 </button>
                             </div>

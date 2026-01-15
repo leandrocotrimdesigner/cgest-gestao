@@ -192,9 +192,9 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   return (
     <div className="space-y-6 animate-fadeIn pb-8">
       {/* 1. Inspiração do Dia (TOPO) */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#FF00FF] to-purple-600 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div><h2 className="text-blue-100 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2"><Quote size={16} className="fill-blue-400 text-blue-400" />Inspiração do Dia</h2><p className="text-xl md:text-2xl font-serif font-medium italic leading-relaxed">"{todaysVerse.text}"</p><p className="mt-2 text-blue-200 text-sm font-semibold">— {todaysVerse.reference}</p></div>
+            <div><h2 className="text-white/80 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2"><Quote size={16} className="fill-white/40 text-white/40" />Inspiração do Dia</h2><p className="text-xl md:text-2xl font-serif font-medium italic leading-relaxed">"{todaysVerse.text}"</p><p className="mt-2 text-white/70 text-sm font-semibold">— {todaysVerse.reference}</p></div>
             <div className="hidden md:block opacity-20 transform rotate-12"><Briefcase size={80} /></div>
         </div>
       </div>
@@ -218,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                 </h3>
                 <button 
                     onClick={openRecentDetails}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-[#FF00FF] hover:bg-slate-100 rounded-md transition-colors"
                     title="Ver Detalhes"
                 >
                     <List size={18} />
@@ -289,16 +289,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
         {/* Coluna 3: Tarefas de Hoje */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><CheckSquare size={20} className="text-blue-500"/>Tarefas de Hoje</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><CheckSquare size={20} className="text-[#FF00FF]"/>Tarefas de Hoje</h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                 {todaysTasks.length > 0 ? (
                     todaysTasks.map(task => {
                         const projectName = getProjectName(task.projectId);
                         return (
-                            <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                            <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-[#FCD282]'}`}>
                                 <button 
                                     onClick={() => onToggleTask(task.id, !task.isCompleted)}
-                                    className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}
+                                    className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-[#FF00FF]'}`}
                                 >
                                     {task.isCompleted && <Check size={12} strokeWidth={3} />}
                                 </button>
@@ -308,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                                             {task.title}
                                         </p>
                                         {task.isMeeting && !task.isCompleted && (
-                                            <div className="ml-2 bg-blue-50 text-blue-600 rounded p-1" title="Reunião">
+                                            <div className="ml-2 bg-purple-50 text-purple-600 rounded p-1" title="Reunião">
                                                 <Video size={14} />
                                             </div>
                                         )}
@@ -322,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                                             </div>
                                         )}
                                         {task.isMeeting && task.meetingTime && !task.isCompleted && (
-                                            <div className="flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded text-blue-700">
+                                            <div className="flex items-center gap-1 bg-purple-50 px-1.5 py-0.5 rounded text-purple-700">
                                                 <Clock size={10} />
                                                 <span className="text-xs font-bold">{task.meetingTime}</span>
                                             </div>
@@ -334,7 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                     })
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg p-4 text-center">
-                        <Calendar size={24} className="mb-2 opacity-50 text-blue-500"/>
+                        <Calendar size={24} className="mb-2 opacity-50 text-[#FF00FF]"/>
                         <p>Nenhuma tarefa para hoje.</p>
                     </div>
                 )}
@@ -361,7 +361,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <FileText size={20} className="text-blue-600"/> 
+                        <FileText size={20} className="text-[#FF00FF]"/> 
                         Detalhamento de Receita
                     </h3>
                     <p className="text-sm text-slate-500">

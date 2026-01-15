@@ -27,12 +27,17 @@ const Agenda: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   useEffect(() => {
-    // Debug log solicitado para verificar a chave na Vercel usando process.env
+    // CORREÇÃO: Leitura correta das variáveis
     const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
-    console.log('Client ID carregado (Agenda):', clientId);
+    const apiKey = process.env.VITE_GOOGLE_API_KEY;
     
-    if (!clientId) {
-        console.warn('VITE_GOOGLE_CLIENT_ID está undefined no componente Agenda.');
+    console.log('Verificando chaves de API:', { 
+        hasClientId: !!clientId, 
+        hasApiKey: !!apiKey 
+    });
+
+    if (!clientId || !apiKey) {
+        console.warn('As chaves VITE_GOOGLE_CLIENT_ID ou VITE_GOOGLE_API_KEY estão ausentes.');
     }
 
     const init = async () => {
@@ -120,7 +125,7 @@ const Agenda: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <CalendarIcon className="text-blue-600" /> Agenda Google
+            <CalendarIcon className="text-[#FF00FF]" /> Agenda Google
           </h2>
           <p className="text-slate-500">Sincronize seus compromissos</p>
         </div>
@@ -129,7 +134,7 @@ const Agenda: React.FC = () => {
              {isConnected && (
                  <button 
                     onClick={() => fetchEvents(currentDate)} 
-                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 text-slate-500 hover:text-[#FF00FF] hover:bg-slate-100 rounded-lg transition-colors"
                     title="Atualizar Agenda"
                  >
                      <RefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
@@ -139,7 +144,7 @@ const Agenda: React.FC = () => {
              {!isConnected ? (
                 <button 
                     onClick={handleConnect}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all hover:shadow-lg active:scale-95"
+                    className="flex items-center gap-2 bg-[#FCD282] hover:bg-[#e6c075] text-black px-5 py-2.5 rounded-lg font-bold shadow-md transition-all hover:shadow-lg active:scale-95"
                 >
                     <div className="bg-white p-1 rounded-full shrink-0">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
@@ -197,13 +202,13 @@ const Agenda: React.FC = () => {
                             className={`
                                 min-h-[80px] p-2 rounded-lg border transition-all cursor-pointer relative flex flex-col
                                 ${!isCurrentMonth ? 'bg-slate-50 text-slate-400 border-transparent' : 'bg-white'}
-                                ${isSelected ? 'ring-2 ring-blue-500 border-transparent z-10' : 'border-slate-100 hover:border-blue-300'}
+                                ${isSelected ? 'ring-2 ring-[#FF00FF] border-transparent z-10' : 'border-slate-100 hover:border-[#FF00FF]'}
                             `}
                           >
                               <div className="flex justify-between items-start">
                                   <span className={`
                                     text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full
-                                    ${isTodayDate ? 'bg-blue-600 text-white shadow-md' : ''}
+                                    ${isTodayDate ? 'bg-[#FF00FF] text-white shadow-md' : ''}
                                   `}>
                                       {format(day, 'd')}
                                   </span>
@@ -211,7 +216,7 @@ const Agenda: React.FC = () => {
                               
                               <div className="mt-1 space-y-1 overflow-hidden">
                                   {dayEvents.slice(0, 3).map((ev, i) => (
-                                      <div key={i} className="text-[10px] truncate px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-100">
+                                      <div key={i} className="text-[10px] truncate px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium border border-purple-100">
                                           {ev.summary}
                                       </div>
                                   ))}
@@ -243,7 +248,7 @@ const Agenda: React.FC = () => {
                           return (
                               <div key={event.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                                   <div className="flex items-start gap-3">
-                                      <div className="w-1 h-full min-h-[40px] bg-blue-500 rounded-full"></div>
+                                      <div className="w-1 h-full min-h-[40px] bg-[#FF00FF] rounded-full"></div>
                                       <div className="flex-1 min-w-0">
                                           <h5 className="font-semibold text-slate-800 text-sm truncate" title={event.summary}>
                                               {event.summary}

@@ -25,15 +25,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  // Classe compartilhada para garantir uniformidade visual exata
-  const inputClass = "w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 text-slate-900 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all block opacity-100";
+  const inputClass = "w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 text-slate-900 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-[#FF00FF] focus:border-transparent outline-none transition-all block opacity-100";
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-100">
         <div className="p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FF00FF] to-purple-600 bg-clip-text text-transparent mb-2">
               CGest
             </h1>
             <p className="text-slate-500 text-sm">Entre para gerenciar seu negócio</p>
@@ -81,7 +80,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md shadow-blue-200"
+              className="w-full bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
             >
               {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Entrar'}
             </button>

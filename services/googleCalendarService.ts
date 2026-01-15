@@ -1,5 +1,4 @@
 
-
 // Declaração de tipos globais para as bibliotecas do Google carregadas via CDN
 declare global {
   interface Window {
@@ -8,7 +7,7 @@ declare global {
   }
 }
 
-// Usando process.env (compatibilidade com env do projeto)
+// CORREÇÃO: Usando process.env para compatibilidade
 const API_KEY = process.env.VITE_GOOGLE_API_KEY || '';
 const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
 
@@ -47,16 +46,9 @@ class GoogleCalendarService {
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       // Verificação de segurança e aviso no console
-      if (!API_KEY) {
-        console.warn('AVISO CRÍTICO: VITE_GOOGLE_API_KEY não foi encontrada nas variáveis de ambiente (process.env).');
-      }
-      if (!CLIENT_ID) {
-        console.warn('AVISO CRÍTICO: VITE_GOOGLE_CLIENT_ID não foi encontrada nas variáveis de ambiente (process.env).');
-      }
-
       if (!API_KEY || !CLIENT_ID) {
-        console.warn('Google Calendar Service não pode ser inicializado sem as chaves.');
-        resolve(); 
+        console.warn('AVISO CRÍTICO: Chaves do Google não encontradas em process.env. O serviço não será inicializado.');
+        resolve(); // Resolvemos para não quebrar a app, mas o serviço ficará inativo
         return;
       }
 
@@ -94,7 +86,7 @@ class GoogleCalendarService {
   handleAuthClick = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!this.tokenClient) {
-        reject('Token client not initialized');
+        reject('Token client not initialized (Verifique as chaves de API)');
         return;
       }
 
@@ -150,7 +142,7 @@ class GoogleCalendarService {
     }
   };
 
-  // NOVO: Cria evento na agenda
+  // Cria evento na agenda
   createEvent = async (eventData: CreateEventDTO): Promise<any> => {
     if (!this.isGapiInitialized || !this.isAuthenticated()) {
       throw new Error("Usuário não autenticado no Google Calendar");

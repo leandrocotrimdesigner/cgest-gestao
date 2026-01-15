@@ -92,7 +92,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
     setFormData({ status: 'pending', paymentStatus: 'pending', budget: 0, name: '', clientId: '' });
   };
 
-  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none";
+  const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none";
 
   return (
     <div className="space-y-6">
@@ -101,7 +101,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
           <h2 className="text-2xl font-bold text-slate-800">Projetos</h2>
           <p className="text-slate-500">Acompanhe o progresso e orçamento</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+        <button onClick={() => setIsModalOpen(true)} className="bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
           <Plus size={20} /> Novo Projeto
         </button>
       </div>
@@ -110,7 +110,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
         {/* Search */}
         <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="text" placeholder="Buscar projeto ou cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 shadow-sm"/>
+            <input type="text" placeholder="Buscar projeto ou cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FF00FF] outline-none text-slate-700 shadow-sm"/>
         </div>
         
         {/* Filters Wrapper */}
@@ -130,7 +130,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
                     <button 
                         key={status} 
                         onClick={() => setFilterPayment(status)} 
-                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${filterPayment === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${filterPayment === status ? 'bg-white text-[#FF00FF] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         {status === 'all' ? 'Financeiro: Todos' : (status === 'paid' ? 'Pagos' : 'Pendentes')}
                     </button>
@@ -178,7 +178,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
                 </div>
 
                 <div className="border-t border-slate-100 pt-3">
-                   <select value={project.status} onChange={(e) => onUpdateStatus(project.id, e.target.value as ProjectStatus)} className="w-full text-xs border-slate-200 border rounded py-1.5 px-2 bg-white text-slate-600 outline-none cursor-pointer hover:border-blue-400 transition-colors"><option value="pending">Pendente</option><option value="in_progress">Em Andamento</option><option value="completed">Concluído</option><option value="cancelled">Cancelado</option></select>
+                   <select value={project.status} onChange={(e) => onUpdateStatus(project.id, e.target.value as ProjectStatus)} className="w-full text-xs border-slate-200 border rounded py-1.5 px-2 bg-white text-slate-600 outline-none cursor-pointer hover:border-[#FF00FF] transition-colors"><option value="pending">Pendente</option><option value="in_progress">Em Andamento</option><option value="completed">Concluído</option><option value="cancelled">Cancelado</option></select>
                 </div>
             </div>
           </div>
@@ -224,7 +224,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
                  <div><label className="block text-sm font-medium text-slate-700 mb-1">Pagamento</label><select value={formData.paymentStatus} onChange={e => setFormData({...formData, paymentStatus: e.target.value as PaymentStatus})} className={inputClass}><option value="pending">Pendente</option><option value="paid">Pago</option></select></div>
               </div>
               <div><label className="block text-sm font-medium text-slate-700 mb-1">Orçamento</label><input type="number" value={formData.budget || ''} onChange={e => setFormData({...formData, budget: parseFloat(e.target.value)})} className={inputClass} /></div>
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Criar</button></div>
+              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold rounded-lg">Criar</button></div>
             </form>
           </div>
         </div>
