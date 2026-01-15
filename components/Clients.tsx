@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { Client, Payment, ClientStatus } from '../types';
-import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, XCircle, Edit2, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, XCircle, Edit2, Calendar, UploadCloud, Paperclip, Loader2 } from 'lucide-react';
 import { DateSelector } from './DateSelector';
+import { googleDriveService } from '../services/googleDriveService';
 
 interface ClientsProps {
   clients: Client[];
@@ -34,7 +35,9 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   const [formData, setFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5 });
   
   // Financial Modal Form State
-  const [newPaymentData, setNewPaymentData] = useState({ value: 0, description: '', month: '' });
+  const [newPaymentData, setNewPaymentData] = useState({ value: 0, description: '', month: '', receiptUrl: '' });
+  // Upload State
+  const [isUploading, setIsUploading] = useState(false);
 
   // Filtering
   const displayedClients = clients.filter(c => {
@@ -155,8 +158,10 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       setNewPaymentData({ 
           value: client.monthlyValue || 0, 
           description: '', 
-          month: String(currentMonth)
+          month: String(currentMonth),
+          receiptUrl: ''
       });
+      setIsUploading(false);
       setIsFinancialModalOpen(true);
   }
 
@@ -168,13 +173,31 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+       // Inicializa cliente se necessário e faz upload
+       await googleDriveService.initClient();
+       const webViewLink = await googleDriveService.uploadFile(file);
+       setNewPaymentData(prev => ({ ...prev, receiptUrl: webViewLink }));
+       alert("Comprovante enviado para o Google Drive!");
+    } catch (error) {
+       console.error("Erro no upload", error);
+       alert("Erro ao enviar arquivo para o Drive. Verifique permissões.");
+    } finally {
+       setIsUploading(false);
+    }
+  };
+
   const handleManualPaymentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if(selectedClient && onAddPayment) {
           const monthIndex = parseInt(newPaymentData.month);
           const year = selectedYear;
-          // Set to 10th of the month by default or current day? 
-          // Let's use 10th to be consistent with due dates, or just construct a valid date
+          // Set to 10th of the month by default
           const day = '10'; 
           const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
 
@@ -184,11 +207,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
               description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
               dueDate: dateStr,
               status: 'paid', // Immediately paid as requested
-              paidAt: dateStr // Register payment date for dashboard revenue
+              paidAt: dateStr, // Register payment date for dashboard revenue
+              receiptUrl: newPaymentData.receiptUrl // Salva o link do Drive
           });
           
-          // Reset description but keep value for ease of entry
-          setNewPaymentData(prev => ({ ...prev, description: '' }));
+          // Reset description and file but keep value for ease of entry
+          setNewPaymentData(prev => ({ ...prev, description: '', receiptUrl: '' }));
       }
   };
 
@@ -431,27 +455,55 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                 </div>
                             </div>
                             
-                            <div className="flex gap-4 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Mês de Referência</label>
-                                    <div className="flex gap-2">
-                                        <select 
-                                            value={newPaymentData.month} 
-                                            onChange={e => setNewPaymentData({...newPaymentData, month: e.target.value})}
-                                            className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                                        >
-                                            {fullMonths.map((m, i) => (
-                                                <option key={i} value={i}>{m}</option>
-                                            ))}
-                                        </select>
-                                        <div className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg border border-slate-200">
-                                            {selectedYear}
-                                        </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Comprovante (Google Drive)</label>
+                                    <div className="flex items-center gap-2">
+                                        <label className={`
+                                            flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer w-full
+                                            ${newPaymentData.receiptUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-300 hover:border-blue-400 text-slate-500'}
+                                        `}>
+                                            {isUploading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <UploadCloud size={16} />}
+                                            <span className="text-sm truncate">
+                                                {isUploading ? 'Enviando...' : (newPaymentData.receiptUrl ? 'Comprovante Anexado' : 'Upload PDF/Imagem')}
+                                            </span>
+                                            <input 
+                                                type="file" 
+                                                accept="application/pdf,image/*" 
+                                                onChange={handleFileUpload}
+                                                className="hidden"
+                                                disabled={isUploading}
+                                            />
+                                        </label>
                                     </div>
                                 </div>
-                                <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all h-[42px]">
-                                    Adicionar
-                                </button>
+
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Mês de Referência</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                value={newPaymentData.month} 
+                                                onChange={e => setNewPaymentData({...newPaymentData, month: e.target.value})}
+                                                className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                {fullMonths.map((m, i) => (
+                                                    <option key={i} value={i}>{m}</option>
+                                                ))}
+                                            </select>
+                                            <div className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg border border-slate-200">
+                                                {selectedYear}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isUploading}
+                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-bold shadow-md transition-all h-[42px]"
+                                    >
+                                        Adicionar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -477,8 +529,20 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                 <button 
                                     key={month} 
                                     onClick={() => handleMonthClick(index)} 
-                                    className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] ${statusColor}`}
+                                    className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] relative group ${statusColor}`}
                                 >
+                                    {payment?.receiptUrl && (
+                                        <a 
+                                            href={payment.receiptUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute top-2 right-2 p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-full transition-colors z-10"
+                                            title="Ver Comprovante"
+                                        >
+                                            <Paperclip size={14} />
+                                        </a>
+                                    )}
                                     <span className="text-sm font-bold uppercase">{month}</span>
                                     {payment ? (
                                         <span className="text-xs font-mono font-semibold">{formatCurrency(payment.value)}</span>

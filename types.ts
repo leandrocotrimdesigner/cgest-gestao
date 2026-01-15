@@ -20,6 +20,7 @@ export interface Payment {
   status: 'paid' | 'pending';
   paidAt?: string; // Data do pagamento efetivo
   description?: string; // Ex: Mensalidade Maio/24
+  receiptUrl?: string; // Link para o comprovante no Google Drive
 }
 
 export type ProjectStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
