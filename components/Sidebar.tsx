@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
   const sidebarClasses = `
     fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out
     ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-    md:translate-x-0 md:static md:inset-0 flex flex-col
+    md:translate-x-0 md:sticky md:top-0 md:h-screen flex flex-col justify-between shadow-xl md:shadow-none
   `;
 
   return (
@@ -47,42 +47,45 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
       {/* Sidebar */}
       <div className={sidebarClasses}>
         
-        {/* LOGO AREA */}
-        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <span className="text-white font-bold text-xl font-sans leading-none">C</span>
-             </div>
-             
-             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">
-               CGest
-             </h1>
-          </div>
-          <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
-            <X size={24} />
-          </button>
+        {/* TOP SECTION (Logo + Menu) */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+            {/* LOGO AREA */}
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center flex-shrink-0">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <span className="text-white font-bold text-xl font-sans leading-none">C</span>
+                 </div>
+                 
+                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-tight">
+                   CGest
+                 </h1>
+              </div>
+              <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* MENU ITEMS (Scrollable Area) */}
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+              {menuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleNav(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                    activeTab === item.id 
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 translate-x-1' 
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1'
+                  }`}
+                >
+                  <item.icon size={20} className={activeTab === item.id ? 'animate-pulse' : ''} />
+                  <span className="font-medium">{item.label}</span>
+                </button>
+              ))}
+            </nav>
         </div>
 
-        {/* MENU ITEMS */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                activeTab === item.id 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 translate-x-1' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1'
-              }`}
-            >
-              <item.icon size={20} className={activeTab === item.id ? 'animate-pulse' : ''} />
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        {/* USER PROFILE FOOTER */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+        {/* USER PROFILE FOOTER (Fixed at Bottom) */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex-shrink-0">
           <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-lg bg-slate-800/50">
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center overflow-hidden shrink-0 relative">
