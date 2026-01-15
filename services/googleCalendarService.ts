@@ -34,8 +34,10 @@ class GoogleCalendarService {
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!API_KEY || !CLIENT_ID) {
-        console.warn('Google API Key or Client ID missing in .env');
-        resolve(); // Resolve anyway to allow app to run without crashing
+        console.warn('Google API Key or Client ID missing in env');
+        // Não rejeitamos aqui para não travar a UI, apenas logamos o aviso
+        // O botão de conectar falhará graciosamente se clicado
+        resolve(); 
         return;
       }
 

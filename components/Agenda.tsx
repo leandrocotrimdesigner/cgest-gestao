@@ -24,15 +24,8 @@ const Agenda: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
-  const [configMissing, setConfigMissing] = useState(false);
 
   useEffect(() => {
-    // Check if env vars are present
-    if (!process.env.VITE_GOOGLE_API_KEY || !process.env.VITE_GOOGLE_CLIENT_ID) {
-        setConfigMissing(true);
-        return;
-    }
-
     const init = async () => {
       try {
         await googleCalendarService.initClient();
@@ -73,7 +66,7 @@ const Agenda: React.FC = () => {
       fetchEvents(currentDate);
     } catch (error) {
       console.error("Auth failed", error);
-      alert("Falha na autenticação com Google.");
+      alert("Falha na autenticação com Google. Verifique se as janelas pop-up estão permitidas.");
     }
   };
 
@@ -134,16 +127,14 @@ const Agenda: React.FC = () => {
                  </button>
              )}
              
-             {configMissing ? (
-                 <div className="bg-yellow-50 text-yellow-700 px-4 py-2 rounded-lg text-sm border border-yellow-200">
-                     ⚠️ Configure o .env.local
-                 </div>
-             ) : !isConnected ? (
+             {!isConnected ? (
                 <button 
                     onClick={handleConnect}
-                    className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg font-medium shadow-sm transition-all"
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all hover:shadow-lg active:scale-95"
                 >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                    <div className="bg-white p-1 rounded-full shrink-0">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
+                    </div>
                     Conectar com Google
                 </button>
             ) : (
