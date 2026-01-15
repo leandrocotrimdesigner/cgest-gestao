@@ -9,6 +9,7 @@ import Goals from './components/Goals';
 import Tasks from './components/Tasks';
 import Login from './components/Login';
 import Profile from './components/Profile'; 
+import Agenda from './components/Agenda';
 import { dataService } from './services/dataService';
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from './types';
 
@@ -217,6 +218,9 @@ function App() {
                 onUpdatePaymentStatus={handleUpdateProjectPaymentStatus}
                 onDeleteProject={handleDeleteProject}
               />
+            )}
+            {activeTab === 'agenda' && (
+              <Agenda />
             )}
             {activeTab === 'goals' && (
               <Goals 

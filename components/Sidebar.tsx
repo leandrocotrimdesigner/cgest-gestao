@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Briefcase, LogOut, X, Target, CheckSquare, UserCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, LogOut, X, Target, CheckSquare, UserCircle, Calendar } from 'lucide-react';
 import { User } from '../types';
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'projects', label: 'Projetos', icon: Briefcase },
+    { id: 'agenda', label: 'Agenda', icon: Calendar },
     { id: 'goals', label: 'Metas', icon: Target },
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare },
     { id: 'profile', label: 'Meu Perfil', icon: UserCircle },
