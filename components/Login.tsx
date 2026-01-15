@@ -31,10 +31,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-100">
         <div className="p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-blue-600 mb-2">
-              CGest
-            </h1>
+          <div className="text-center mb-8 flex flex-col items-center">
+            {/* Logo Colorida */}
+            <img 
+                src="https://lh3.googleusercontent.com/d/1zdSeNj43Wsrn-r29x6FPuSzbMG--v6F2" 
+                alt="CGest" 
+                className="h-24 w-auto object-contain mb-4"
+            />
             <p className="text-slate-500 text-sm">Entre para gerenciar seu negócio</p>
           </div>
 
@@ -91,7 +94,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </form>
         </div>
         <div className="bg-slate-50 p-4 border-t border-slate-100 text-center text-xs text-slate-400">
-          &copy; 2024 CGest System.
+          &copy; 2026 CGest System.
         </div>
       </div>
     </div>

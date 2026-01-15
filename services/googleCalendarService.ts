@@ -7,9 +7,17 @@ declare global {
   }
 }
 
-// CORREÇÃO DEFINITIVA: Usando import.meta.env (Padrão Vite)
-const API_KEY = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
-const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '';
+// Helper seguro para ler variáveis de ambiente (evita crash se import.meta.env for undefined)
+const getEnvVar = (key: string) => {
+  try {
+    return (import.meta as any).env?.[key] || '';
+  } catch {
+    return '';
+  }
+};
+
+const API_KEY = getEnvVar('VITE_GOOGLE_API_KEY');
+const CLIENT_ID = getEnvVar('VITE_GOOGLE_CLIENT_ID');
 
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
 const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
@@ -42,43 +50,45 @@ class GoogleCalendarService {
   // Inicializa o cliente GAPI
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // VERIFICAÇÃO DE SEGURANÇA:
-      // Se não houver chaves (ambiente de desenvolvimento/editor), não tenta carregar o GAPI.
-      // Isso evita a tela branca ou erros de script.
-      if (!API_KEY || !CLIENT_ID) {
-        console.warn('Google Calendar: Chaves de API não detectadas. O serviço funcionará em modo offline/demonstração.');
-        resolve(); 
-        return;
-      }
+      try {
+        // Verificação de segurança: Modo Edição (sem chaves)
+        if (!API_KEY || !CLIENT_ID) {
+          console.warn('Modo Edição: Agenda desativada (Chaves de API ausentes)');
+          resolve();
+          return;
+        }
 
-      if (window.gapi) {
-        window.gapi.load('client', async () => {
-          try {
-            await window.gapi.client.init({
-              apiKey: API_KEY,
-              discoveryDocs: DISCOVERY_DOCS,
-            });
-            this.isGapiInitialized = true;
-            
-            // Initialize Identity Services
-            if (window.google) {
-              this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: '', // Defined at request time
+        if (window.gapi) {
+          window.gapi.load('client', async () => {
+            try {
+              await window.gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
               });
+              this.isGapiInitialized = true;
+              
+              // Initialize Identity Services
+              if (window.google) {
+                this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                  client_id: CLIENT_ID,
+                  scope: SCOPES,
+                  callback: '', // Defined at request time
+                });
+              }
+              
+              resolve();
+            } catch (error) {
+              console.error('Error initializing GAPI client', error);
+              // Resolvemos mesmo com erro para não travar a UI
+              resolve();
             }
-            
-            resolve();
-          } catch (error) {
-            console.error('Error initializing GAPI client', error);
-            // Resolvemos mesmo com erro para não travar a UI, apenas a funcionalidade de calendário falhará
-            resolve();
-          }
-        });
-      } else {
-        // Se o script não carregou (ex: bloqueador de anúncios ou falha de rede), resolvemos para não travar o app
-        console.warn('Google API script not loaded');
+          });
+        } else {
+          console.warn('Google API script not loaded');
+          resolve();
+        }
+      } catch (e) {
+        console.error('Erro fatal ao iniciar Google Calendar Service:', e);
         resolve();
       }
     });
@@ -88,7 +98,6 @@ class GoogleCalendarService {
   handleAuthClick = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!this.tokenClient) {
-        // Em vez de rejeitar com erro fatal, apenas alertamos
         console.warn('Token client not initialized. Verifique as chaves de API.');
         reject('Integração com Google não configurada.');
         return;
