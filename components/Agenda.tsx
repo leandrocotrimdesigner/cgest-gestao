@@ -26,6 +26,9 @@ const Agenda: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   useEffect(() => {
+    // Debug log solicitado para verificar a chave na Vercel
+    console.log('Client ID carregado:', (import.meta as any).env.VITE_GOOGLE_CLIENT_ID);
+
     const init = async () => {
       try {
         await googleCalendarService.initClient();
@@ -66,7 +69,7 @@ const Agenda: React.FC = () => {
       fetchEvents(currentDate);
     } catch (error) {
       console.error("Auth failed", error);
-      alert("Falha na autenticação com Google. Verifique se as janelas pop-up estão permitidas.");
+      alert("Falha na autenticação com Google. Verifique o console para detalhes.");
     }
   };
 

@@ -7,10 +7,12 @@ declare global {
   }
 }
 
-const API_KEY = process.env.VITE_GOOGLE_API_KEY || '';
-const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
+// Usando import.meta.env (Padrão Vite) para garantir leitura correta na Vercel
+const API_KEY = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
+const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '';
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events.readonly';
+// Atualizado para incluir o escopo mais amplo de leitura
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly';
 
 export interface GoogleEvent {
   id: string;
@@ -35,8 +37,6 @@ class GoogleCalendarService {
     return new Promise((resolve, reject) => {
       if (!API_KEY || !CLIENT_ID) {
         console.warn('Google API Key or Client ID missing in env');
-        // Não rejeitamos aqui para não travar a UI, apenas logamos o aviso
-        // O botão de conectar falhará graciosamente se clicado
         resolve(); 
         return;
       }
@@ -79,6 +79,7 @@ class GoogleCalendarService {
         return;
       }
 
+      // Callback do novo GIS (Google Identity Services)
       this.tokenClient.callback = async (resp: any) => {
         if (resp.error) {
           reject(resp);
@@ -86,11 +87,12 @@ class GoogleCalendarService {
         resolve();
       };
 
+      // GIS (google.accounts.oauth2) usa popup por padrão.
+      // gapi.auth2.getAuthInstance() não é mais usado com este fluxo.
+      // Verificamos se há token válido via gapi.client
       if (window.gapi.client.getToken() === null) {
-        // Prompt the user to select a Google Account and ask for consent to share their data
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
       } else {
-        // Skip display of account chooser and consent dialog for an existing session.
         this.tokenClient.requestAccessToken({ prompt: '' });
       }
     });
