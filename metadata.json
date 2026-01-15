@@ -1,0 +1,5 @@
+{
+  "name": "CGest - Sistema de Gestão",
+  "description": "Sistema de gestão para freelancers e agências com controle de clientes (mensalistas/avulsos), projetos e dashboards financeiros. Conectável ao Supabase.",
+  "requestFramePermissions": []
+}
