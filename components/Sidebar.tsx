@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
   };
 
   const sidebarClasses = `
-    fixed inset-y-0 left-0 z-30 w-64 bg-[#FF00FF] text-white transform transition-transform duration-300 ease-in-out
+    fixed inset-y-0 left-0 z-30 w-64 bg-[#212121] text-white transform transition-transform duration-300 ease-in-out
     ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
     md:translate-x-0 md:sticky md:top-0 md:h-screen flex flex-col justify-between shadow-xl md:shadow-none
   `;
@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
                     alt="CGest Logo" 
                     className="h-10 w-auto object-contain invert brightness-0"
                  />
-                 <span className="font-bold text-xl tracking-tight">CGest</span>
+                 <span className="font-bold text-xl tracking-tight text-white">CGest</span>
               </div>
               <button onClick={() => setIsMobileOpen(false)} className="md:hidden text-white hover:bg-white/10 rounded p-1 transition-colors">
                 <X size={24} />
@@ -72,11 +72,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
                   onClick={() => handleNav(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     activeTab === item.id 
-                      ? 'bg-[#FCD282] text-black shadow-lg translate-x-1 font-bold' 
+                      ? 'bg-gradient-to-r from-[#FF00FF] to-[#FCD282] text-black shadow-lg translate-x-1 font-bold' 
                       : 'text-white hover:bg-white/10 hover:translate-x-1'
                   }`}
                 >
-                  <item.icon size={20} className={activeTab === item.id ? '' : 'opacity-80'} />
+                  <item.icon size={20} className={activeTab === item.id ? 'text-black' : 'opacity-80'} />
                   <span className="font-medium">{item.label}</span>
                 </button>
               ))}
@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
         </div>
 
         {/* USER PROFILE FOOTER (Fixed at Bottom) */}
-        <div className="p-4 border-t border-white/10 bg-black/10 flex-shrink-0">
+        <div className="p-4 border-t border-white/10 bg-black/20 flex-shrink-0">
           <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-lg bg-black/20">
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0 relative">

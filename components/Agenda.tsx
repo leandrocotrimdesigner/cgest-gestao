@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, RefreshCw, LogOut } from 'lucide-react';
 import { googleCalendarService, GoogleEvent } from '../services/googleCalendarService';
@@ -27,18 +26,15 @@ const Agenda: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   useEffect(() => {
-    // CORREÇÃO: Leitura correta das variáveis
-    const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
-    const apiKey = process.env.VITE_GOOGLE_API_KEY;
+    // CORREÇÃO DEFINITIVA: Leitura via import.meta.env
+    const clientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+    const apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY;
     
-    console.log('Verificando chaves de API:', { 
+    // Debug para verificar carregamento (Remover em produção se desejar)
+    console.log('Status Env Vars:', { 
         hasClientId: !!clientId, 
         hasApiKey: !!apiKey 
     });
-
-    if (!clientId || !apiKey) {
-        console.warn('As chaves VITE_GOOGLE_CLIENT_ID ou VITE_GOOGLE_API_KEY estão ausentes.');
-    }
 
     const init = async () => {
       try {
@@ -59,7 +55,6 @@ const Agenda: React.FC = () => {
     try {
         const start = startOfMonth(date);
         const end = endOfMonth(date);
-        // Extend to cover visible grid (prev/next month days)
         const gridStart = startOfWeek(start);
         const gridEnd = endOfWeek(end);
         
@@ -67,7 +62,7 @@ const Agenda: React.FC = () => {
         setEvents(fetchedEvents);
     } catch (error) {
         console.error(error);
-        if (isConnected) setIsConnected(false); // Token might have expired
+        if (isConnected) setIsConnected(false);
     } finally {
         setIsLoading(false);
     }
@@ -80,7 +75,7 @@ const Agenda: React.FC = () => {
       fetchEvents(currentDate);
     } catch (error) {
       console.error("Auth failed", error);
-      alert("Falha na autenticação com Google. Verifique o console para detalhes.");
+      alert("Falha na autenticação. Verifique o console para erros de API Key.");
     }
   };
 
@@ -144,7 +139,7 @@ const Agenda: React.FC = () => {
              {!isConnected ? (
                 <button 
                     onClick={handleConnect}
-                    className="flex items-center gap-2 bg-[#FCD282] hover:bg-[#e6c075] text-black px-5 py-2.5 rounded-lg font-bold shadow-md transition-all hover:shadow-lg active:scale-95"
+                    className="flex items-center gap-2 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black px-5 py-2.5 rounded-lg font-bold shadow-md transition-all active:scale-95"
                 >
                     <div className="bg-white p-1 rounded-full shrink-0">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
@@ -165,9 +160,7 @@ const Agenda: React.FC = () => {
 
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col md:flex-row">
           
-          {/* Main Calendar Grid */}
           <div className="flex-1 flex flex-col border-r border-slate-100 p-4">
-              {/* Calendar Header */}
               <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold text-slate-800 capitalize">
                       {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
@@ -178,7 +171,6 @@ const Agenda: React.FC = () => {
                   </div>
               </div>
 
-              {/* Week Headers */}
               <div className="grid grid-cols-7 mb-2">
                   {weekDays.map(day => (
                       <div key={day} className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-2">
@@ -187,7 +179,6 @@ const Agenda: React.FC = () => {
                   ))}
               </div>
 
-              {/* Days Grid */}
               <div className="grid grid-cols-7 flex-1 auto-rows-fr gap-1">
                   {calendarDays.map((day, dayIdx) => {
                       const dayEvents = getEventsForDay(day);
@@ -232,7 +223,6 @@ const Agenda: React.FC = () => {
               </div>
           </div>
 
-          {/* Side Panel: Selected Day Details */}
           <div className="w-full md:w-80 bg-slate-50 p-6 flex flex-col border-t md:border-t-0 md:border-l border-slate-200">
               <h4 className="text-lg font-bold text-slate-800 mb-1 capitalize">
                   {format(selectedDay, 'EEEE', { locale: ptBR })}

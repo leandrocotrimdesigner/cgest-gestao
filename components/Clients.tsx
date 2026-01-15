@@ -234,7 +234,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
           <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
           <p className="text-slate-500">Gerencie sua base e controle financeiro</p>
         </div>
-        <button onClick={handleOpenAdd} className="bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+        <button onClick={handleOpenAdd} className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95">
           <Plus size={20} /> Novo Cliente
         </button>
       </div>
@@ -387,7 +387,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                   <div><label className="block text-sm font-medium text-slate-700 mb-1">Dia Vencimento</label><input type="number" value={formData.dueDay || ''} onChange={e => setFormData({...formData, dueDay: parseInt(e.target.value)})} className={inputClass} /></div>
                 </div>
               )}
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black rounded-lg font-bold">Salvar</button></div>
+              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black px-4 py-2 rounded-lg font-bold">Salvar</button></div>
             </form>
           </div>
         </div>
@@ -449,7 +449,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" className="px-6 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black rounded-lg font-bold shadow-md transition-colors h-[42px]">
+                                <button type="submit" className="px-6 py-2 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black rounded-lg font-bold shadow-md transition-all h-[42px]">
                                     Adicionar
                                 </button>
                             </div>

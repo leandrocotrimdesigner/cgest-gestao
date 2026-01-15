@@ -101,7 +101,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
           <h2 className="text-2xl font-bold text-slate-800">Projetos</h2>
           <p className="text-slate-500">Acompanhe o progresso e orçamento</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md">
+        <button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95">
           <Plus size={20} /> Novo Projeto
         </button>
       </div>
@@ -224,7 +224,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
                  <div><label className="block text-sm font-medium text-slate-700 mb-1">Pagamento</label><select value={formData.paymentStatus} onChange={e => setFormData({...formData, paymentStatus: e.target.value as PaymentStatus})} className={inputClass}><option value="pending">Pendente</option><option value="paid">Pago</option></select></div>
               </div>
               <div><label className="block text-sm font-medium text-slate-700 mb-1">Orçamento</label><input type="number" value={formData.budget || ''} onChange={e => setFormData({...formData, budget: parseFloat(e.target.value)})} className={inputClass} /></div>
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold rounded-lg">Criar</button></div>
+              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black px-4 py-2 font-bold rounded-lg">Criar</button></div>
             </form>
           </div>
         </div>

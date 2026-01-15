@@ -85,7 +85,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, onAddGoal, onDeleteGoal, onUpdateG
         {!readOnly && (
             <button 
             onClick={handleOpenAdd}
-            className="bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-md"
+            className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all active:scale-95 shadow-md"
             >
             <Plus size={20} />
             Nova Meta
@@ -251,7 +251,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, onAddGoal, onDeleteGoal, onUpdateG
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold rounded-lg">Salvar</button>
+                <button type="submit" className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold px-4 py-2 rounded-lg">Salvar</button>
               </div>
             </form>
           </div>

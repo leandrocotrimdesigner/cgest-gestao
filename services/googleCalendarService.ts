@@ -7,14 +7,12 @@ declare global {
   }
 }
 
-// CORREÇÃO: Usando process.env para compatibilidade
-const API_KEY = process.env.VITE_GOOGLE_API_KEY || '';
-const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
+// CORREÇÃO DEFINITIVA: Usando import.meta.env (Padrão Vite)
+// O TypeScript pode reclamar no editor se não houver types, mas isso é o correto para build Vite/Vercel.
+const API_KEY = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
+const CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || '';
 
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
-
-// ATUALIZADO: Removido .readonly para permitir criação de eventos
-// Adicionado escopo 'https://www.googleapis.com/auth/calendar.events' para gerenciar eventos
 const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
 
 export interface GoogleEvent {
@@ -45,10 +43,11 @@ class GoogleCalendarService {
   // Inicializa o cliente GAPI
   initClient = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // Verificação de segurança e aviso no console
+      // Log de diagnóstico crítico
       if (!API_KEY || !CLIENT_ID) {
-        console.warn('AVISO CRÍTICO: Chaves do Google não encontradas em process.env. O serviço não será inicializado.');
-        resolve(); // Resolvemos para não quebrar a app, mas o serviço ficará inativo
+        console.error('ERRO CRÍTICO: Chaves do Google (VITE_GOOGLE_API_KEY ou VITE_GOOGLE_CLIENT_ID) estão undefined/vazias.');
+        console.error('Verifique seu arquivo .env.local ou as Variáveis de Ambiente na Vercel.');
+        resolve(); // Resolve para não travar a aplicação inteira, mas funcionalidades falharão
         return;
       }
 
@@ -86,11 +85,10 @@ class GoogleCalendarService {
   handleAuthClick = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!this.tokenClient) {
-        reject('Token client not initialized (Verifique as chaves de API)');
+        reject('Token client not initialized. Verifique o console para erros de API KEY.');
         return;
       }
 
-      // Callback do novo GIS (Google Identity Services)
       this.tokenClient.callback = async (resp: any) => {
         if (resp.error) {
           reject(resp);
@@ -98,7 +96,6 @@ class GoogleCalendarService {
         resolve();
       };
 
-      // GIS (google.accounts.oauth2) usa popup por padrão.
       if (window.gapi.client.getToken() === null) {
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
       } else {

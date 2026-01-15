@@ -67,7 +67,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
       meetingTime: isMeeting ? meetingTime : undefined
     });
 
-    // 2. Integração com Google Agenda
+    // 2. Integração com Google Agenda (TENTATIVA)
     if (isMeeting && dueDate && meetingTime) {
       if (googleCalendarService.isAuthenticated()) {
         try {
@@ -89,10 +89,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
            alert("Reunião agendada no Google Calendar com sucesso!");
         } catch (error) {
            console.error("Erro ao sincronizar com Google:", error);
-           alert("A tarefa foi criada, mas houve um erro ao sincronizar com a Agenda Google. Verifique se você concedeu as permissões necessárias.");
+           alert("A tarefa foi criada, mas houve um erro ao sincronizar com a Agenda Google. Verifique o console.");
         }
       } else {
-        alert("A tarefa foi criada, mas não foi possível sincronizar com a Agenda. Por favor, conecte-se ao Google na aba 'Agenda'.");
+        alert("Tarefa criada! Para sincronizar com a agenda, conecte sua conta Google na aba 'Agenda'.");
       }
     }
     
@@ -225,7 +225,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                   )}
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-[#FCD282] hover:bg-[#e6c075] text-black font-bold rounded-lg shadow-md">Adicionar</button>
+              <button type="submit" className="w-full py-2.5 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black font-bold rounded-lg shadow-md transition-all active:scale-95">Adicionar</button>
             </form>
           </div>
         </div>

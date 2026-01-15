@@ -221,7 +221,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <div className="pt-4 flex justify-end">
-                <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-[#FCD282] hover:bg-[#e6c075] text-black px-6 py-2.5 rounded-lg font-bold transition-all shadow-md active:scale-95 disabled:opacity-70">
+                <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-gradient-to-r from-[#FF00FF] to-[#FCD282] hover:opacity-90 text-black px-6 py-2.5 rounded-lg font-bold transition-all shadow-md active:scale-95 disabled:opacity-70">
                     <Save size={18} /> {isLoading ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
             </div>

@@ -116,8 +116,6 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   };
 
   const handleBarClick = (data: any) => {
-    console.log("Abrindo detalhes da data:", data);
-    
     // Case 1: Clicked on Chart (Recharts passes object with activePayload)
     if (data && data.activePayload && data.activePayload.length > 0) {
         const payload = data.activePayload[0].payload;
@@ -138,7 +136,6 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
     const lastDayWithRevenue = [...weeklyRevenueData].reverse().find(d => d.revenue > 0);
     const targetDate = lastDayWithRevenue ? lastDayWithRevenue.date : new Date().toISOString().split('T')[0];
     
-    console.log("Abrindo detalhes (botão) para:", targetDate);
     setSelectedDate(targetDate);
     setIsDetailsOpen(true);
   };
@@ -192,10 +189,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   return (
     <div className="space-y-6 animate-fadeIn pb-8">
       {/* 1. Inspiração do Dia (TOPO) */}
-      <div className="bg-gradient-to-r from-[#FF00FF] to-purple-600 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#FF00FF] to-[#FCD282] rounded-xl p-6 text-black shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div><h2 className="text-white/80 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2"><Quote size={16} className="fill-white/40 text-white/40" />Inspiração do Dia</h2><p className="text-xl md:text-2xl font-serif font-medium italic leading-relaxed">"{todaysVerse.text}"</p><p className="mt-2 text-white/70 text-sm font-semibold">— {todaysVerse.reference}</p></div>
-            <div className="hidden md:block opacity-20 transform rotate-12"><Briefcase size={80} /></div>
+            <div>
+                <h2 className="text-black/60 font-medium text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Quote size={16} className="fill-black/40 text-black/40" />Inspiração do Dia
+                </h2>
+                <p className="text-xl md:text-2xl font-serif font-bold italic leading-relaxed text-black/90">"{todaysVerse.text}"</p>
+                <p className="mt-2 text-black/70 text-sm font-semibold">— {todaysVerse.reference}</p>
+            </div>
+            <div className="hidden md:block opacity-10 transform rotate-12 text-black/20"><Briefcase size={80} /></div>
         </div>
       </div>
 
