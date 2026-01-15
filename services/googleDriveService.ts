@@ -24,6 +24,7 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 class GoogleDriveService {
   private tokenClient: any;
   private isGapiInitialized = false;
+  private cachedFolderId: string | null = null;
 
   constructor() {
     this.tokenClient = null;
@@ -41,10 +42,8 @@ class GoogleDriveService {
         if (window.gapi) {
           window.gapi.load('client', async () => {
             try {
-              // Verifica se o cliente do Drive já foi carregado (por outro serviço)
-              // Se não, inicializa. 
-              // Nota: gapi.client.init deve ser cuidadoso ao ser chamado múltiplas vezes
-              // Aqui usamos init para garantir discovery docs
+              // Inicializa o cliente com os docs de descoberta do Drive
+              // Se já estiver inicializado por outro serviço, isso adiciona a capacidade do Drive
               await window.gapi.client.init({
                 apiKey: API_KEY,
                 discoveryDocs: DISCOVERY_DOCS,
@@ -56,7 +55,7 @@ class GoogleDriveService {
                 this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                   client_id: CLIENT_ID,
                   scope: SCOPES,
-                  callback: '', // Callback será definido dinamicamente
+                  callback: '', // Callback será definido dinamicamente na chamada de Auth
                 });
               }
               resolve();
@@ -66,6 +65,7 @@ class GoogleDriveService {
             }
           });
         } else {
+          console.warn("GAPI script not loaded");
           resolve();
         }
       } catch (e) {
@@ -81,7 +81,7 @@ class GoogleDriveService {
         // Tenta reinicializar se falhar
         this.initClient().then(() => {
             if(!this.tokenClient) {
-                 reject('Drive não configurado');
+                 reject('Drive não configurado ou bloqueado.');
                  return;
             }
             this.triggerTokenRequest(resolve, reject);
@@ -94,15 +94,24 @@ class GoogleDriveService {
 
   private triggerTokenRequest = (resolve: any, reject: any) => {
       this.tokenClient.callback = async (resp: any) => {
-        if (resp.error) reject(resp);
-        resolve();
+        if (resp.error) {
+            reject(resp);
+        } else {
+            resolve();
+        }
       };
-      // Força prompt se necessário ou usa incremental auth
-      this.tokenClient.requestAccessToken({ prompt: '' });
+      
+      // Se já existe um token, usa prompt vazio para tentar renovar silenciosamente se possível
+      // Se falhar (erro de permissão), o usuário terá que clicar novamente para consentir
+      const existingToken = window.gapi.client.getToken();
+      this.tokenClient.requestAccessToken({ prompt: existingToken ? '' : 'consent' });
   }
 
   // Encontra ou cria a pasta 'Comprovantes_CGest'
   private getOrCreateFolder = async (): Promise<string> => {
+    // 1. Verifica Cache
+    if (this.cachedFolderId) return this.cachedFolderId;
+
     try {
       const q = "mimeType='application/vnd.google-apps.folder' and name='Comprovantes_CGest' and trashed=false";
       const response = await window.gapi.client.drive.files.list({
@@ -112,6 +121,7 @@ class GoogleDriveService {
       });
 
       if (response.result.files && response.result.files.length > 0) {
+        this.cachedFolderId = response.result.files[0].id;
         return response.result.files[0].id;
       } else {
         // Criar pasta
@@ -123,6 +133,7 @@ class GoogleDriveService {
           resource: fileMetadata,
           fields: 'id'
         });
+        this.cachedFolderId = createResponse.result.id;
         return createResponse.result.id;
       }
     } catch (error) {
@@ -132,17 +143,18 @@ class GoogleDriveService {
   };
 
   uploadFile = async (file: File): Promise<string> => {
-    if (!this.isGapiInitialized) {
+    // Garante inicialização
+    if (!this.isGapiInitialized || !window.gapi || !window.gapi.client) {
        await this.initClient();
     }
     
-    // Tenta garantir autenticação inicial
+    // Verifica token
     if (!window.gapi.client.getToken()) {
         await this.handleAuthClick();
     }
 
     const executeUpload = async () => {
-        // 1. Garante a pasta
+        // 1. Garante a pasta (usa cache se disponível)
         const folderId = await this.getOrCreateFolder();
 
         // 2. Prepara Upload Multipart
@@ -165,7 +177,6 @@ class GoogleDriveService {
 
         if (!res.ok) {
              const errorBody = await res.json();
-             // Lança erro estruturado
              throw { status: res.status, ...errorBody };
         }
 
@@ -182,12 +193,15 @@ class GoogleDriveService {
         const isAuthError = error.status === 401 || error.status === 403 || error.result?.error?.code === 401;
 
         if (isAuthError) {
-             console.log("Renovando token de acesso...");
-             await this.handleAuthClick(); // Abre popup para renovar/conceder permissão
-             return await executeUpload(); // Tenta novamente
+             console.log("Renovando token de acesso para Drive...");
+             // Força o prompt de consentimento para garantir o escopo drive.file
+             this.tokenClient.requestAccessToken({ prompt: 'consent' }); 
+             
+             // Aguarda nova tentativa do usuário (não podemos aguardar o callback aqui facilmente sem Promise complexa)
+             // Então lançamos erro instruindo o usuário a tentar novamente após o popup
+             throw new Error("Permissão necessária. Por favor, autorize o acesso ao Drive na janela pop-up e tente enviar novamente.");
         }
         
-        // Se não for auth, repassa o erro
         throw error;
     }
   };

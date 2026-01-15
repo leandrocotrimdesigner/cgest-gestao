@@ -179,14 +179,18 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
     setIsUploading(true);
     try {
-       // Inicializa cliente se necessário e faz upload
+       // Inicializa cliente se necessário para garantir APIs carregadas
        await googleDriveService.initClient();
+       
        const webViewLink = await googleDriveService.uploadFile(file);
+       
+       // Salva URL no estado do formulário para ser usada no submit
        setNewPaymentData(prev => ({ ...prev, receiptUrl: webViewLink }));
-       alert("Comprovante enviado para o Google Drive!");
-    } catch (error) {
+       alert("Comprovante enviado com sucesso para pasta 'Comprovantes_CGest'!");
+    } catch (error: any) {
        console.error("Erro no upload", error);
-       alert("Erro ao enviar arquivo para o Drive. Verifique permissões.");
+       const msg = error.message || "Erro desconhecido ao enviar arquivo.";
+       alert(`Falha no upload: ${msg}`);
     } finally {
        setIsUploading(false);
     }
@@ -194,22 +198,41 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
   const handleManualPaymentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if(selectedClient && onAddPayment) {
+      if(selectedClient && onAddPayment && onUpdatePayment) {
           const monthIndex = parseInt(newPaymentData.month);
           const year = selectedYear;
-          // Set to 10th of the month by default
-          const day = '10'; 
-          const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
 
-          await onAddPayment({
-              clientId: selectedClient.id,
-              value: Number(newPaymentData.value),
-              description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
-              dueDate: dateStr,
-              status: 'paid', // Immediately paid as requested
-              paidAt: dateStr, // Register payment date for dashboard revenue
-              receiptUrl: newPaymentData.receiptUrl // Salva o link do Drive
-          });
+          // Assunto A3: Verifica se já existe pagamento para este mês/ano
+          const existingPayment = getPaymentForMonth(monthIndex);
+
+          if (existingPayment) {
+              // UPDATE (Sobreposição)
+              await onUpdatePayment({
+                  ...existingPayment,
+                  value: Number(newPaymentData.value),
+                  // Se o usuário digitou uma nova descrição, usa ela. Senão mantém a antiga.
+                  description: newPaymentData.description || existingPayment.description,
+                  // Se o usuário fez upload de novo arquivo, usa ele. Senão mantém o antigo.
+                  receiptUrl: newPaymentData.receiptUrl || existingPayment.receiptUrl,
+                  status: 'paid', // Garante status pago ao lançar manualmente
+                  paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
+              });
+              alert("Lançamento atualizado com sucesso!");
+          } else {
+              // INSERT (Novo)
+              const day = '10'; 
+              const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
+              
+              await onAddPayment({
+                  clientId: selectedClient.id,
+                  value: Number(newPaymentData.value),
+                  description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
+                  dueDate: dateStr,
+                  status: 'paid',
+                  paidAt: dateStr,
+                  receiptUrl: newPaymentData.receiptUrl
+              });
+          }
           
           // Reset description and file but keep value for ease of entry
           setNewPaymentData(prev => ({ ...prev, description: '', receiptUrl: '' }));
@@ -460,12 +483,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                     <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Comprovante (Google Drive)</label>
                                     <div className="flex items-center gap-2">
                                         <label className={`
-                                            flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer w-full
-                                            ${newPaymentData.receiptUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-300 hover:border-blue-400 text-slate-500'}
+                                            flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer w-full transition-colors
+                                            ${newPaymentData.receiptUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-300 hover:border-blue-400 text-slate-500 hover:bg-slate-50'}
                                         `}>
-                                            {isUploading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <UploadCloud size={16} />}
+                                            {isUploading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : (newPaymentData.receiptUrl ? <CheckCircle size={16} className="text-green-600"/> : <UploadCloud size={16} />)}
                                             <span className="text-sm truncate">
-                                                {isUploading ? 'Enviando...' : (newPaymentData.receiptUrl ? 'Comprovante Anexado' : 'Upload PDF/Imagem')}
+                                                {isUploading ? 'Enviando para Drive...' : (newPaymentData.receiptUrl ? 'Comprovante Salvo' : 'Upload PDF/Imagem')}
                                             </span>
                                             <input 
                                                 type="file" 
@@ -476,6 +499,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                             />
                                         </label>
                                     </div>
+                                    {newPaymentData.receiptUrl && <p className="text-[10px] text-green-600 mt-1 pl-1">Arquivo vinculado com sucesso!</p>}
                                 </div>
 
                                 <div className="flex gap-4 items-end">
@@ -537,8 +561,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                             target="_blank" 
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="absolute top-2 right-2 p-1 text-slate-400 hover:text-blue-600 hover:bg-white rounded-full transition-colors z-10"
-                                            title="Ver Comprovante"
+                                            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-blue-600 text-blue-600 hover:text-white rounded-full transition-colors z-10 shadow-sm"
+                                            title="Ver Comprovante (Drive)"
                                         >
                                             <Paperclip size={14} />
                                         </a>
