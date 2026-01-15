@@ -83,8 +83,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
         </div>
 
         {/* USER PROFILE FOOTER (Fixed at Bottom) */}
-        <div className="p-4 border-t border-white/10 bg-black/20 flex-shrink-0">
-          <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-lg bg-black/20">
+        <div className="p-4 border-t border-white/10 flex-shrink-0">
+          <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-lg">
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0 relative">
                 {user?.avatar ? (

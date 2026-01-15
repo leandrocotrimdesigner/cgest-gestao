@@ -184,6 +184,24 @@ class GoogleCalendarService {
       throw err;
     }
   };
+
+  // Exclui evento da agenda
+  deleteEvent = async (eventId: string): Promise<void> => {
+    if (!this.isGapiInitialized || !this.isAuthenticated()) {
+      console.warn("Tentativa de deletar evento sem autenticação");
+      return;
+    }
+
+    try {
+      await window.gapi.client.calendar.events.delete({
+        'calendarId': 'primary',
+        'eventId': eventId
+      });
+    } catch (err) {
+      console.error('Error deleting event', err);
+      throw err;
+    }
+  };
 }
 
 export const googleCalendarService = new GoogleCalendarService();

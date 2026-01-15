@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, Project } from '../types';
-import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2 } from 'lucide-react';
+import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2, CalendarX } from 'lucide-react';
 import { DateSelector } from './DateSelector';
 import { googleCalendarService } from '../services/googleCalendarService';
 
@@ -26,6 +26,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [undoTask, setUndoTask] = useState<Task | null>(null);
   const [undoTimer, setUndoTimer] = useState<number | null>(null);
+
+  // Meeting Deletion Modal State
+  const [meetingToDelete, setMeetingToDelete] = useState<Task | null>(null);
 
   // Limpeza automática de IDs já excluídos do backend
   useEffect(() => {
@@ -57,17 +60,9 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     
-    // 1. Criar a Tarefa no Sistema
-    await onAddTask({
-      title: newTaskTitle,
-      isCompleted: false,
-      projectId: selectedProjectId || undefined,
-      dueDate: dueDate || undefined,
-      isMeeting: isMeeting,
-      meetingTime: isMeeting ? meetingTime : undefined
-    });
+    let googleEventId: string | undefined = undefined;
 
-    // 2. Integração com Google Agenda (TENTATIVA)
+    // 1. Integração com Google Agenda (TENTATIVA)
     if (isMeeting && dueDate && meetingTime) {
       if (googleCalendarService.isAuthenticated()) {
         try {
@@ -79,22 +74,36 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
            const projectName = getProjectName(selectedProjectId);
            const description = projectName ? `Projeto: ${projectName}` : 'Tarefa criada via CGest';
 
-           await googleCalendarService.createEvent({
+           const response = await googleCalendarService.createEvent({
              summary: newTaskTitle,
              description: description,
              start: start.toISOString(),
              end: end.toISOString()
            });
            
-           alert("Reunião agendada no Google Calendar com sucesso!");
+           if (response && response.result) {
+              googleEventId = response.result.id;
+              alert("Reunião agendada no Google Calendar com sucesso!");
+           }
         } catch (error) {
            console.error("Erro ao sincronizar com Google:", error);
-           alert("A tarefa foi criada, mas houve um erro ao sincronizar com a Agenda Google. Verifique o console.");
+           alert("A tarefa será criada localmente, mas houve um erro ao sincronizar com a Agenda Google.");
         }
       } else {
         alert("Tarefa criada! Para sincronizar com a agenda, conecte sua conta Google na aba 'Agenda'.");
       }
     }
+
+    // 2. Criar a Tarefa no Sistema com o ID do Google (se existir)
+    await onAddTask({
+      title: newTaskTitle,
+      isCompleted: false,
+      projectId: selectedProjectId || undefined,
+      dueDate: dueDate || undefined,
+      isMeeting: isMeeting,
+      meetingTime: isMeeting ? meetingTime : undefined,
+      googleEventId: googleEventId
+    });
     
     // Reset form
     setNewTaskTitle('');
@@ -104,10 +113,20 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     setMeetingTime('');
   };
 
-  const handleDelete = (e: React.MouseEvent, task: Task) => {
+  const handleTaskDeleteRequest = (e: React.MouseEvent, task: Task) => {
     e.stopPropagation();
     e.preventDefault();
 
+    if (task.isMeeting) {
+        // Se for reunião, abre o modal de confirmação específico
+        setMeetingToDelete(task);
+    } else {
+        // Se for tarefa comum, segue o fluxo normal com Undo
+        handleStandardDelete(task);
+    }
+  };
+
+  const handleStandardDelete = (task: Task) => {
     // Se já existe uma tarefa pendente de exclusão, confirma ela imediatamente
     if (undoTask && undoTimer) {
         clearTimeout(undoTimer);
@@ -132,6 +151,26 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     }, 5000);
 
     setUndoTimer(timer);
+  };
+
+  const confirmMeetingDelete = async () => {
+      if (!meetingToDelete) return;
+
+      // 1. Tentar excluir do Google Calendar se tiver ID
+      if (meetingToDelete.googleEventId && googleCalendarService.isAuthenticated()) {
+          try {
+              await googleCalendarService.deleteEvent(meetingToDelete.googleEventId);
+          } catch (error) {
+              console.error("Erro ao excluir do Google Calendar", error);
+              alert("A tarefa foi excluída do sistema, mas não foi possível removê-la da Agenda Google (erro de API ou permissão).");
+          }
+      }
+
+      // 2. Excluir do Sistema (sem Undo para reuniões confirmadas no modal)
+      onDeleteTask(meetingToDelete.id);
+      
+      // 3. Limpar estado
+      setMeetingToDelete(null);
   };
 
   const handleUndo = () => {
@@ -302,7 +341,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                                     
                                     <button 
                                         type="button"
-                                        onClick={(e) => handleDelete(e, task)}
+                                        onClick={(e) => handleTaskDeleteRequest(e, task)}
                                         className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors"
                                     >
                                         <Trash2 size={18} />
@@ -323,6 +362,53 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
           {displayedTasks.length === 0 && (<div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">Nenhuma tarefa pendente.</div>)}
         </div>
       </div>
+
+      {/* CONFIRMATION MODAL FOR MEETING DELETION */}
+      {meetingToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setMeetingToDelete(null)}>
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="p-6 bg-red-50 border-b border-red-100 flex items-start gap-4">
+                <div className="p-2 bg-red-100 rounded-full text-red-600">
+                  <CalendarX size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-red-900">Excluir Reunião</h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    Esta é uma reunião agendada.
+                  </p>
+                </div>
+                <button onClick={() => setMeetingToDelete(null)} className="ml-auto text-red-400 hover:text-red-700"><X size={20} /></button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-slate-700">
+                  Deseja excluí-la também da sua <span className="font-bold">Agenda do Google</span>?
+                </p>
+                
+                <div className="flex flex-col gap-2 pt-2">
+                  <button 
+                    onClick={confirmMeetingDelete}
+                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    Sim, excluir de tudo
+                  </button>
+                  <button 
+                    onClick={() => { onDeleteTask(meetingToDelete.id); setMeetingToDelete(null); }}
+                    className="w-full px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-all"
+                  >
+                    Apenas do CGest (Manter no Google)
+                  </button>
+                  <button 
+                    onClick={() => setMeetingToDelete(null)} 
+                    className="w-full px-4 py-2 text-slate-500 hover:text-slate-800 text-sm mt-2"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
       
       <style>{`
         @keyframes fadeInLeft {

@@ -55,6 +55,7 @@ export interface Task {
   createdAt: string;
   isMeeting?: boolean; // Flag para identificar se é reunião
   meetingTime?: string; // Horário da reunião (HH:mm)
+  googleEventId?: string; // ID do evento no Google Calendar para exclusão
 }
 
 export interface User {
