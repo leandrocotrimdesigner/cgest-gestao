@@ -41,8 +41,10 @@ class GoogleDriveService {
         if (window.gapi) {
           window.gapi.load('client', async () => {
             try {
-              // Verifica se já não foi inicializado pelo Calendar Service para evitar duplicidade crítica
-              // Mas garante o carregamento do Discovery do Drive
+              // Verifica se o cliente do Drive já foi carregado (por outro serviço)
+              // Se não, inicializa. 
+              // Nota: gapi.client.init deve ser cuidadoso ao ser chamado múltiplas vezes
+              // Aqui usamos init para garantir discovery docs
               await window.gapi.client.init({
                 apiKey: API_KEY,
                 discoveryDocs: DISCOVERY_DOCS,
@@ -54,7 +56,7 @@ class GoogleDriveService {
                 this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                   client_id: CLIENT_ID,
                   scope: SCOPES,
-                  callback: '', // Definido na chamada
+                  callback: '', // Callback será definido dinamicamente
                 });
               }
               resolve();
@@ -76,20 +78,28 @@ class GoogleDriveService {
   handleAuthClick = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!this.tokenClient) {
-        reject('Drive não configurado');
+        // Tenta reinicializar se falhar
+        this.initClient().then(() => {
+            if(!this.tokenClient) {
+                 reject('Drive não configurado');
+                 return;
+            }
+            this.triggerTokenRequest(resolve, reject);
+        });
         return;
       }
-      
+      this.triggerTokenRequest(resolve, reject);
+    });
+  };
+
+  private triggerTokenRequest = (resolve: any, reject: any) => {
       this.tokenClient.callback = async (resp: any) => {
         if (resp.error) reject(resp);
         resolve();
       };
-
-      // Solicita permissão específica para o Drive
-      // Se o usuário já deu permissão para o Calendar, o Google gerencia isso (Incremental auth)
+      // Força prompt se necessário ou usa incremental auth
       this.tokenClient.requestAccessToken({ prompt: '' });
-    });
-  };
+  }
 
   // Encontra ou cria a pasta 'Comprovantes_CGest'
   private getOrCreateFolder = async (): Promise<string> => {
@@ -126,38 +136,59 @@ class GoogleDriveService {
        await this.initClient();
     }
     
-    // Tenta garantir autenticação antes do upload
+    // Tenta garantir autenticação inicial
     if (!window.gapi.client.getToken()) {
         await this.handleAuthClick();
     }
 
+    const executeUpload = async () => {
+        // 1. Garante a pasta
+        const folderId = await this.getOrCreateFolder();
+
+        // 2. Prepara Upload Multipart
+        const metadata = {
+            name: `Comprovante_${Date.now()}_${file.name}`,
+            parents: [folderId]
+        };
+
+        const accessToken = window.gapi.client.getToken().access_token;
+        const form = new FormData();
+        
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', file);
+
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+            method: 'POST',
+            headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+            body: form
+        });
+
+        if (!res.ok) {
+             const errorBody = await res.json();
+             // Lança erro estruturado
+             throw { status: res.status, ...errorBody };
+        }
+
+        const data = await res.json();
+        return data.webViewLink; 
+    };
+
     try {
-      const folderId = await this.getOrCreateFolder();
+        return await executeUpload();
+    } catch (error: any) {
+        console.warn("Falha no upload, verificando permissões...", error);
+        
+        // Verifica se é erro de Auth (401 - Unauthorized, 403 - Forbidden)
+        const isAuthError = error.status === 401 || error.status === 403 || error.result?.error?.code === 401;
 
-      const metadata = {
-        name: `Comprovante_${Date.now()}_${file.name}`,
-        parents: [folderId]
-      };
-
-      const accessToken = window.gapi.client.getToken().access_token;
-      const form = new FormData();
-      
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', file);
-
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-        method: 'POST',
-        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-        body: form
-      });
-
-      const data = await res.json();
-      if (data.error) throw data.error;
-
-      return data.webViewLink; // Retorna o link de visualização
-    } catch (error) {
-      console.error('Erro no upload', error);
-      throw error;
+        if (isAuthError) {
+             console.log("Renovando token de acesso...");
+             await this.handleAuthClick(); // Abre popup para renovar/conceder permissão
+             return await executeUpload(); // Tenta novamente
+        }
+        
+        // Se não for auth, repassa o erro
+        throw error;
     }
   };
 }

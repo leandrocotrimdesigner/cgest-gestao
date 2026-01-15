@@ -20,7 +20,8 @@ const API_KEY = getEnvVar('VITE_GOOGLE_API_KEY');
 const CLIENT_ID = getEnvVar('VITE_GOOGLE_CLIENT_ID');
 
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'];
-const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
+// ADICIONADO ESCOPO DO DRIVE AQUI PARA PERMITIR LOGIN ÚNICO SE O USUÁRIO ENTRAR PELA AGENDA
+const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file';
 
 export interface GoogleEvent {
   id: string;
