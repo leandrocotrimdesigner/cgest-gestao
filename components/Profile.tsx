@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User } from '../types';
 import { User as UserIcon, Mail, Lock, Save, Shield, Camera, Download, Upload, Trash2, AlertTriangle, X } from 'lucide-react';
@@ -99,8 +98,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
               if (confirm('ATENÇÃO: Isso substituirá seus dados atuais pelos dados do backup. Deseja continuar?')) {
                   await dataService.restoreBackupData(json);
                   alert('Importação Concluída!');
-                  // Redireciona para a origem para evitar erros 404 em sub-rotas/ambientes virtuais
-                  window.location.href = window.location.origin;
+                  window.location.reload();
               }
           } catch (error) {
               console.error(error);
@@ -113,13 +111,13 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
   };
 
   // --- CLEAR DATA LOGIC ---
-  const handleConfirmClear = async () => {
+  const handleConfirmClear = () => {
       if (deletePassword === 'admin123') {
           try {
-              await dataService.clearSystemData('admin');
-              alert('Sistema resetado com sucesso!');
-              // Redireciona para a origem para evitar erros 404 em sub-rotas/ambientes virtuais
-              window.location.href = window.location.origin;
+              // Limpeza direta do localStorage conforme solicitado para evitar problemas de roteamento
+              localStorage.clear();
+              alert('Sistema resetado com sucesso! A página será recarregada.');
+              window.location.reload();
           } catch (e) {
               alert('Erro ao limpar dados.');
           }
