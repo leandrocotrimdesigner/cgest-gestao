@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { Client, Payment, ClientStatus } from '../types';
-import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, XCircle, Edit2, Calendar, UploadCloud, Paperclip, Loader2, FileText } from 'lucide-react';
-import { DateSelector } from './DateSelector';
+import { Client, Payment } from '../types';
+import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, Edit2, UploadCloud, FileText, Loader2, Filter } from 'lucide-react';
 import { googleDriveService } from '../services/googleDriveService';
 import { useToast } from './ToastContext';
+import { BaseModal } from './BaseModal';
 
 interface ClientsProps {
   clients: Client[];
@@ -18,95 +18,36 @@ interface ClientsProps {
 
 const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, onUpdateClient, onDeleteClient, onAddPayment, onUpdatePayment }) => {
   const { addToast } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isFinancialModalOpen, setIsFinancialModalOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   
-  // Edit State
+  // Modals State
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isFinancialModalOpen, setIsFinancialModalOpen] = useState(false);
+  
+  // Selection State
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   
-  // States for Deletion (Meta Style)
+  // Deletion States
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-
-  // State for Attachment Deletion
   const [attachmentToDelete, setAttachmentToDelete] = useState<Payment | null>(null);
 
+  // Filters & UI
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); 
-  
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const [formData, setFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5 });
   
-  // Financial Modal Form State
-  const [newPaymentData, setNewPaymentData] = useState({ value: 0, description: '', month: '', receiptUrl: '' });
-  // Upload State
+  // Forms State
+  const [clientFormData, setClientFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5 });
+  const [paymentFormData, setPaymentFormData] = useState({ value: 0, description: '', month: '', receiptUrl: '' });
   const [isUploading, setIsUploading] = useState(false);
 
-  // Filtering
+  // --- Helpers ---
   const displayedClients = clients.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus && !deletedIds.has(c.id);
   });
-
-  // Handle Delete Client Request
-  const handleDeleteRequest = (e: React.MouseEvent, client: Client) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setClientToDelete(client);
-    setDeleteConfirmationText('');
-  };
-
-  // Confirm Client Delete
-  const confirmDelete = async () => {
-    if (clientToDelete) {
-        setDeletedIds(prev => {
-            const next = new Set(prev);
-            next.add(clientToDelete.id);
-            return next;
-        });
-
-        try {
-            await onDeleteClient(clientToDelete.id);
-            addToast({ type: 'success', title: 'Cliente removido' });
-        } catch (error) {
-            setDeletedIds(prev => {
-                const next = new Set(prev);
-                next.delete(clientToDelete.id);
-                return next;
-            });
-            addToast({ type: 'error', title: 'Erro ao excluir', message: 'Tente novamente.' });
-        } finally {
-            setClientToDelete(null);
-        }
-    }
-  };
-
-  // Handle Attachment Delete Request
-  const handleRemoveAttachmentRequest = (e: React.MouseEvent, payment: Payment) => {
-    e.stopPropagation(); // Prevent toggling payment status
-    setAttachmentToDelete(payment);
-  };
-
-  // Confirm Attachment Delete
-  const confirmRemoveAttachment = async () => {
-      if (attachmentToDelete && onUpdatePayment) {
-          try {
-              // Updates payment keeping all data except receiptUrl
-              await onUpdatePayment({
-                  ...attachmentToDelete,
-                  receiptUrl: '' // Clears the link
-              });
-              addToast({ type: 'success', title: 'Anexo removido', message: 'O vínculo foi desfeito com sucesso.' });
-          } catch (error) {
-              addToast({ type: 'error', title: 'Erro', message: 'Não foi possível remover o anexo.' });
-          } finally {
-              setAttachmentToDelete(null);
-          }
-      }
-  };
 
   const getClientFinancialStatus = (client: Client) => {
       if (client.status === 'inactive') return 'inactive';
@@ -132,60 +73,92 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       return 'ok';
   };
 
-  const handleOpenAdd = () => {
-    setEditingClient(null);
-    setFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5 });
-    setIsModalOpen(true);
+  const getPaymentForMonth = (monthIndex: number) => {
+      if (!selectedClient) return null;
+      return payments.find(p => {
+          const d = new Date(p.dueDate);
+          return p.clientId === selectedClient.id && d.getMonth() === monthIndex && d.getFullYear() === selectedYear;
+      });
   };
 
-  const handleOpenEdit = (e: React.MouseEvent, client: Client) => {
+  // --- Handlers: Client CRUD ---
+  
+  const handleOpenAddClient = () => {
+    setEditingClient(null);
+    setClientFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5 });
+    setIsClientModalOpen(true);
+  };
+
+  const handleOpenEditClient = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation();
     setEditingClient(client);
-    setFormData({
+    setClientFormData({
         name: client.name,
         type: client.type,
         status: client.status,
         monthlyValue: client.monthlyValue || 0,
         dueDay: client.dueDay || 5
     });
-    setIsModalOpen(true);
+    setIsClientModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleClientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) return;
+    if (!clientFormData.name) return;
 
     const payload = {
-      name: formData.name,
-      type: formData.type as 'mensalista' | 'avulso',
-      status: formData.status as 'active' | 'inactive',
-      monthlyValue: formData.type === 'mensalista' ? Number(formData.monthlyValue) : undefined,
-      dueDay: formData.type === 'mensalista' ? Number(formData.dueDay) : undefined,
+      name: clientFormData.name,
+      type: clientFormData.type as 'mensalista' | 'avulso',
+      status: clientFormData.status as 'active' | 'inactive',
+      monthlyValue: clientFormData.type === 'mensalista' ? Number(clientFormData.monthlyValue) : undefined,
+      dueDay: clientFormData.type === 'mensalista' ? Number(clientFormData.dueDay) : undefined,
     };
 
-    if (editingClient && onUpdateClient) {
-        await onUpdateClient({
-            ...editingClient,
-            ...payload
-        });
-        addToast({ type: 'success', title: 'Cliente atualizado' });
-    } else {
-        await onAddClient(payload);
-        addToast({ type: 'success', title: 'Cliente adicionado' });
+    try {
+        if (editingClient && onUpdateClient) {
+            await onUpdateClient({ ...editingClient, ...payload });
+            addToast({ type: 'success', title: 'Cliente atualizado' });
+        } else {
+            await onAddClient(payload);
+            addToast({ type: 'success', title: 'Cliente adicionado' });
+        }
+        setIsClientModalOpen(false);
+    } catch (e) {
+        addToast({ type: 'error', title: 'Erro ao salvar cliente' });
     }
-    
-    setIsModalOpen(false);
   };
 
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const fullMonths = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const handleDeleteClientRequest = (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation();
+    setClientToDelete(client);
+  };
+
+  const confirmDeleteClient = async () => {
+    if (clientToDelete) {
+        setDeletedIds(prev => new Set(prev).add(clientToDelete.id)); // Optimistic
+        try {
+            await onDeleteClient(clientToDelete.id);
+            addToast({ type: 'success', title: 'Cliente removido' });
+        } catch (error) {
+            setDeletedIds(prev => {
+                const next = new Set(prev);
+                next.delete(clientToDelete.id);
+                return next;
+            });
+            addToast({ type: 'error', title: 'Erro ao excluir' });
+        } finally {
+            setClientToDelete(null);
+        }
+    }
+  };
+
+  // --- Handlers: Financial & Attachments ---
 
   const handleOpenFinancial = (e: React.MouseEvent, client: Client) => {
       e.stopPropagation();
       setSelectedClient(client);
-      // Default to current month
       const currentMonth = new Date().getMonth();
-      setNewPaymentData({ 
+      setPaymentFormData({ 
           value: client.monthlyValue || 0, 
           description: '', 
           month: String(currentMonth),
@@ -195,14 +168,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       setIsFinancialModalOpen(true);
   }
 
-  const getPaymentForMonth = (monthIndex: number) => {
-      if (!selectedClient) return null;
-      return payments.find(p => {
-          const d = new Date(p.dueDate);
-          return p.clientId === selectedClient.id && d.getMonth() === monthIndex && d.getFullYear() === selectedYear;
-      });
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -211,57 +176,59 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
     try {
        await googleDriveService.initClient();
        const webViewLink = await googleDriveService.uploadFile(file);
-       setNewPaymentData(prev => ({ ...prev, receiptUrl: webViewLink }));
-       addToast({ type: 'success', title: 'Upload Concluído', message: 'O comprovante foi salvo no Drive e vinculado.' });
+       setPaymentFormData(prev => ({ ...prev, receiptUrl: webViewLink }));
+       addToast({ type: 'success', title: 'Upload Concluído', message: 'Comprovante vinculado.' });
     } catch (error: any) {
        console.error("Erro no upload", error);
-       addToast({ type: 'error', title: 'Falha no Upload', message: error.message || "Erro desconhecido." });
+       addToast({ type: 'error', title: 'Falha no Upload', message: error.message || "Verifique as permissões." });
     } finally {
        setIsUploading(false);
        e.target.value = '';
     }
   };
 
-  const handleManualPaymentSubmit = async (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if(selectedClient && onAddPayment && onUpdatePayment) {
-          const monthIndex = parseInt(newPaymentData.month);
-          const year = selectedYear;
-          const existingPayment = getPaymentForMonth(monthIndex);
+      if(!selectedClient || !onAddPayment || !onUpdatePayment) return;
 
-          try {
-            if (existingPayment) {
-                await onUpdatePayment({
-                    ...existingPayment,
-                    value: Number(newPaymentData.value),
-                    description: newPaymentData.description || existingPayment.description,
-                    receiptUrl: newPaymentData.receiptUrl || existingPayment.receiptUrl,
-                    status: 'paid',
-                    paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
-                });
-                addToast({ type: 'success', title: 'Lançamento atualizado!', message: 'Os dados foram sobrepostos com sucesso.' });
-            } else {
-                const day = '10'; 
-                const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
-                await onAddPayment({
-                    clientId: selectedClient.id,
-                    value: Number(newPaymentData.value),
-                    description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
-                    dueDate: dateStr,
-                    status: 'paid',
-                    paidAt: dateStr,
-                    receiptUrl: newPaymentData.receiptUrl
-                });
-                addToast({ type: 'success', title: 'Pagamento registrado!' });
-            }
-            setNewPaymentData(prev => ({ ...prev, description: '', receiptUrl: '' }));
-          } catch (e) {
-              addToast({ type: 'error', title: 'Erro ao salvar', message: 'Não foi possível registrar o pagamento.' });
-          }
+      const monthIndex = parseInt(paymentFormData.month);
+      const existingPayment = getPaymentForMonth(monthIndex);
+
+      try {
+        if (existingPayment) {
+            // Upsert: Update existing
+            await onUpdatePayment({
+                ...existingPayment,
+                value: Number(paymentFormData.value),
+                description: paymentFormData.description || existingPayment.description,
+                receiptUrl: paymentFormData.receiptUrl || existingPayment.receiptUrl,
+                status: 'paid',
+                paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
+            });
+            addToast({ type: 'success', title: 'Atualizado', message: 'Dados financeiros sobrepostos.' });
+        } else {
+            // Upsert: Insert new
+            const day = '10'; 
+            const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
+            await onAddPayment({
+                clientId: selectedClient.id,
+                value: Number(paymentFormData.value),
+                description: paymentFormData.description || `Pagamento ${months[monthIndex]}/${selectedYear}`,
+                dueDate: dateStr,
+                status: 'paid',
+                paidAt: dateStr,
+                receiptUrl: paymentFormData.receiptUrl
+            });
+            addToast({ type: 'success', title: 'Pagamento Criado' });
+        }
+        // Reset form partials
+        setPaymentFormData(prev => ({ ...prev, description: '', receiptUrl: '' }));
+      } catch (e) {
+          addToast({ type: 'error', title: 'Erro ao salvar pagamento' });
       }
   };
 
-  const handleMonthClick = async (monthIndex: number) => {
+  const handleTogglePaymentStatus = async (monthIndex: number) => {
       if (!selectedClient || !onAddPayment || !onUpdatePayment) return;
       const existingPayment = getPaymentForMonth(monthIndex);
       
@@ -273,13 +240,9 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
               paidAt: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : undefined 
           });
       } else {
+          // Create empty paid payment
           const dueDay = selectedClient.dueDay || 10; 
-          const date = new Date(selectedYear, monthIndex, dueDay);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          const dateStr = `${year}-${month}-${day}`;
-          
+          const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(dueDay).padStart(2,'0')}`;
           await onAddPayment({
               clientId: selectedClient.id,
               value: selectedClient.monthlyValue || 0,
@@ -291,6 +254,29 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       }
   };
 
+  const handleRemoveAttachmentRequest = (e: React.MouseEvent, payment: Payment) => {
+    e.stopPropagation();
+    setAttachmentToDelete(payment);
+  };
+
+  const confirmRemoveAttachment = async () => {
+      if (attachmentToDelete && onUpdatePayment) {
+          try {
+              await onUpdatePayment({
+                  ...attachmentToDelete,
+                  receiptUrl: '' // Clears the link
+              });
+              addToast({ type: 'success', title: 'Anexo removido' });
+          } catch (error) {
+              addToast({ type: 'error', title: 'Erro ao remover anexo' });
+          } finally {
+              setAttachmentToDelete(null);
+          }
+      }
+  };
+
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const fullMonths = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   const inputClass = "w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none";
 
@@ -301,7 +287,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
           <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
           <p className="text-slate-500">Gerencie sua base e controle financeiro</p>
         </div>
-        <button onClick={handleOpenAdd} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95">
+        <button onClick={handleOpenAddClient} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95">
           <Plus size={20} /> Novo Cliente
         </button>
       </div>
@@ -312,12 +298,12 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input type="text" placeholder="Buscar clientes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 text-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"/>
           </div>
-          <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-lg overflow-x-auto">
              {(['all', 'active', 'inactive'] as const).map(status => (
                  <button
                     key={status}
                     onClick={() => setStatusFilter(status)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all whitespace-nowrap ${statusFilter === status ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                  >
                     {status === 'all' ? 'Todos' : status === 'active' ? 'Ativos' : 'Inativos'}
                  </button>
@@ -369,20 +355,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                         <td className="px-6 py-4 text-right relative">
                             <div className="flex items-center justify-end gap-2">
                                 <button type="button" onClick={(e) => handleOpenFinancial(e, client)} className="text-blue-600 hover:text-blue-700 bg-blue-50 p-1.5 rounded-md"><DollarSign size={18} /></button>
-                                <button 
-                                    type="button"
-                                    onClick={(e) => handleOpenEdit(e, client)}
-                                    className="text-slate-500 hover:text-blue-600 hover:bg-slate-100 p-1.5 rounded-md transition-colors"
-                                >
-                                    <Edit2 size={18} />
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={(e) => handleDeleteRequest(e, client)}
-                                    className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                <button type="button" onClick={(e) => handleOpenEditClient(e, client)} className="text-slate-500 hover:text-blue-600 hover:bg-slate-100 p-1.5 rounded-md transition-colors"><Edit2 size={18} /></button>
+                                <button type="button" onClick={(e) => handleDeleteClientRequest(e, client)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 size={18} /></button>
                             </div>
                         </td>
                     </tr>
@@ -396,259 +370,242 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         </div>
       </div>
 
-      {/* DELETE MODAL (META ARCHITECTURE) */}
-      {clientToDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" onClick={() => setClientToDelete(null)}>
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="p-6 bg-red-50 border-b border-red-100 flex items-start gap-4">
-                <div className="p-2 bg-red-100 rounded-full text-red-600">
-                  <AlertCircle size={24} />
+      {/* --- MODALS SECTION USING BaseModal --- */}
+
+      {/* 1. Delete Client Confirmation */}
+      <BaseModal
+        isOpen={!!clientToDelete}
+        onClose={() => setClientToDelete(null)}
+        title="Excluir Cliente"
+        variant="danger"
+        icon={<AlertCircle size={24} />}
+      >
+        <div className="space-y-4">
+            <p className="text-slate-600">
+                Você está prestes a excluir <b>{clientToDelete?.name}</b>. Esta ação é irreversível e afetará o histórico financeiro.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setClientToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={confirmDeleteClient} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Exclusão</button>
+            </div>
+        </div>
+      </BaseModal>
+
+      {/* 2. Remove Attachment Confirmation */}
+      <BaseModal
+        isOpen={!!attachmentToDelete}
+        onClose={() => setAttachmentToDelete(null)}
+        title="Remover Anexo"
+        variant="danger"
+        icon={<FileText size={24} />}
+      >
+        <div className="space-y-4">
+            <p className="text-slate-600">
+                Deseja desvincular o comprovante deste pagamento? <br/>
+                <span className="text-xs text-slate-500">O valor e a data do pagamento serão mantidos.</span>
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setAttachmentToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={confirmRemoveAttachment} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Remoção</button>
+            </div>
+        </div>
+      </BaseModal>
+
+      {/* 3. Add/Edit Client Form */}
+      <BaseModal
+        isOpen={isClientModalOpen}
+        onClose={() => setIsClientModalOpen(false)}
+        title={editingClient ? 'Editar Cliente' : 'Novo Cliente'}
+      >
+        <form onSubmit={handleClientSubmit} className="space-y-4">
+            <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome</label><input required type="text" value={clientFormData.name || ''} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} className={inputClass} /></div>
+            
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Contrato</label>
+                <select value={clientFormData.type} onChange={(e) => setClientFormData({...clientFormData, type: e.target.value as any})} className={inputClass}>
+                    <option value="avulso">Avulso</option>
+                    <option value="mensalista">Mensalista</option>
+                </select>
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-red-900">Excluir Cliente</h3>
-                  <p className="text-sm text-red-700 mt-1">
-                    Você está prestes a excluir <b>{clientToDelete.name}</b>.
-                  </p>
-                </div>
-                <button onClick={() => setClientToDelete(null)} className="ml-auto text-red-400 hover:text-red-700"><X size={20} /></button>
-              </div>
-              <div className="p-6">
-                <p className="text-slate-600 text-sm mb-4">Esta ação é irreversível e pode afetar o histórico financeiro.</p>
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => setClientToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                  <button onClick={confirmDelete} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Exclusão</button>
-                </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* NEW/EDIT CLIENT MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fadeIn" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-100"><h3 className="text-xl font-bold text-slate-800">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h3></div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome</label><input required type="text" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} /></div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Contrato</label>
-                    <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value as any})} className={inputClass}>
-                        <option value="avulso">Avulso</option>
-                        <option value="mensalista">Mensalista</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
-                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className={inputClass}>
-                        <option value="active">Ativo</option>
-                        <option value="inactive">Inativo</option>
-                    </select>
-                  </div>
-              </div>
-
-              {formData.type === 'mensalista' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div><label className="block text-sm font-medium text-slate-700 mb-1">Valor Mensal</label><input type="number" value={formData.monthlyValue || ''} onChange={e => setFormData({...formData, monthlyValue: parseFloat(e.target.value)})} className={inputClass} /></div>
-                  <div><label className="block text-sm font-medium text-slate-700 mb-1">Dia Vencimento</label><input type="number" value={formData.dueDay || ''} onChange={e => setFormData({...formData, dueDay: parseInt(e.target.value)})} className={inputClass} /></div>
-                </div>
-              )}
-              <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Salvar</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* FINANCIAL MODAL RESTRUCTURED */}
-      {isFinancialModalOpen && selectedClient && (
-         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsFinancialModalOpen(false)}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl animate-fadeIn flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <div>
-                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><DollarSign size={20} className="text-green-600"/> Financeiro</h3>
-                        <p className="text-sm text-slate-500">{selectedClient.name}</p>
-                    </div>
-                    <button onClick={() => setIsFinancialModalOpen(false)} className="text-slate-400 hover:text-slate-700"><X size={24} /></button>
-                </div>
-                <div className="p-6 overflow-y-auto">
-                    <form onSubmit={handleManualPaymentSubmit} className="bg-white p-5 rounded-xl border border-slate-200 mb-8 shadow-sm">
-                        <div className="flex flex-col gap-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Descrição</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Ex: Mensalidade, Serviço Extra" 
-                                        value={newPaymentData.description} 
-                                        onChange={e => setNewPaymentData({...newPaymentData, description: e.target.value})} 
-                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valor (R$)</label>
-                                    <input 
-                                        type="number" 
-                                        required 
-                                        placeholder="0,00" 
-                                        value={newPaymentData.value || ''} 
-                                        onChange={e => setNewPaymentData({...newPaymentData, value: parseFloat(e.target.value)})} 
-                                        className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Comprovante (Google Drive)</label>
-                                    <div className="flex items-center gap-2">
-                                        <label className={`
-                                            flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer w-full transition-colors
-                                            ${newPaymentData.receiptUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-300 hover:border-blue-400 text-slate-500 hover:bg-slate-50'}
-                                        `}>
-                                            {isUploading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : (newPaymentData.receiptUrl ? <CheckCircle size={16} className="text-green-600"/> : <UploadCloud size={16} />)}
-                                            <span className="text-sm truncate">
-                                                {isUploading ? 'Enviando para Drive...' : (newPaymentData.receiptUrl ? 'Comprovante Salvo' : 'Upload PDF/Imagem')}
-                                            </span>
-                                            <input 
-                                                type="file" 
-                                                accept="application/pdf,image/*" 
-                                                onChange={handleFileUpload}
-                                                className="hidden"
-                                                disabled={isUploading}
-                                            />
-                                        </label>
-                                    </div>
-                                    {newPaymentData.receiptUrl && <p className="text-[10px] text-green-600 mt-1 pl-1">Arquivo vinculado com sucesso!</p>}
-                                </div>
-
-                                <div className="flex gap-4 items-end">
-                                    <div className="flex-1">
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Mês de Referência</label>
-                                        <div className="flex gap-2">
-                                            <select 
-                                                value={newPaymentData.month} 
-                                                onChange={e => setNewPaymentData({...newPaymentData, month: e.target.value})}
-                                                className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                {fullMonths.map((m, i) => (
-                                                    <option key={i} value={i}>{m}</option>
-                                                ))}
-                                            </select>
-                                            <div className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg border border-slate-200">
-                                                {selectedYear}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        type="submit" 
-                                        disabled={isUploading}
-                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-bold shadow-md transition-all h-[42px]"
-                                    >
-                                        Adicionar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Histórico de {selectedYear}</h4>
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setSelectedYear(y => y-1)} className="p-1 hover:bg-slate-100 rounded text-slate-500 font-bold">&lt;</button>
-                            <span className="font-bold text-slate-800 text-lg">{selectedYear}</span>
-                            <button onClick={() => setSelectedYear(y => y+1)} className="p-1 hover:bg-slate-100 rounded text-slate-500 font-bold">&gt;</button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        {months.map((month, index) => {
-                            const payment = getPaymentForMonth(index);
-                            const isPaid = payment?.status === 'paid';
-                            const statusColor = isPaid 
-                                ? 'bg-green-50 border-green-200 text-green-700 shadow-sm' 
-                                : (payment ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-slate-50 border-slate-100 text-slate-400');
-                            
-                            return (
-                                <button 
-                                    key={month} 
-                                    onClick={() => handleMonthClick(index)} 
-                                    className={`relative p-3 rounded-xl border flex flex-col items-center justify-between min-h-[110px] transition-all hover:scale-[1.02] group ${statusColor}`}
-                                >
-                                    <div className="flex justify-between w-full items-start">
-                                        <span className="text-xs font-bold uppercase tracking-wider opacity-70">{month}</span>
-                                        {isPaid && <CheckCircle size={14} className="text-green-600" />}
-                                    </div>
-
-                                    <div className="flex-1 flex flex-col justify-center items-center py-2">
-                                        {payment ? (
-                                            <span className="text-sm font-mono font-bold tracking-tight">{formatCurrency(payment.value)}</span>
-                                        ) : (
-                                            <span className="text-xs opacity-40">-</span>
-                                        )}
-                                    </div>
-
-                                    <div className="w-full h-6 flex items-center justify-center gap-1">
-                                        {payment?.receiptUrl && (
-                                            <>
-                                                <a 
-                                                    href={payment.receiptUrl} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-white/50 hover:bg-white text-slate-600 hover:text-blue-600 border border-transparent hover:border-blue-200 transition-all shadow-sm group-hover:shadow"
-                                                    title="Abrir Comprovante"
-                                                >
-                                                    <FileText size={12} />
-                                                    <span>Ver Doc</span>
-                                                </a>
-                                                <div 
-                                                    onClick={(e) => handleRemoveAttachmentRequest(e, payment)}
-                                                    className="flex items-center justify-center w-6 h-6 rounded-full bg-white/50 hover:bg-red-50 text-slate-400 hover:text-red-600 border border-transparent hover:border-red-100 transition-colors shadow-sm cursor-pointer"
-                                                    title="Excluir Comprovante"
-                                                >
-                                                    <Trash2 size={10} />
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                <select value={clientFormData.status} onChange={(e) => setClientFormData({...clientFormData, status: e.target.value as any})} className={inputClass}>
+                    <option value="active">Ativo</option>
+                    <option value="inactive">Inativo</option>
+                </select>
                 </div>
             </div>
-         </div>
-      )}
 
-      {/* CONFIRMATION MODAL FOR ATTACHMENT DELETION */}
-      {attachmentToDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setAttachmentToDelete(null)}>
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-start gap-4">
-                <div className="p-2 bg-slate-200 rounded-full text-slate-600">
-                  <FileText size={24} />
+            {clientFormData.type === 'mensalista' && (
+            <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium text-slate-700 mb-1">Valor Mensal</label><input type="number" value={clientFormData.monthlyValue || ''} onChange={e => setClientFormData({...clientFormData, monthlyValue: parseFloat(e.target.value)})} className={inputClass} /></div>
+                <div><label className="block text-sm font-medium text-slate-700 mb-1">Dia Vencimento</label><input type="number" value={clientFormData.dueDay || ''} onChange={e => setClientFormData({...clientFormData, dueDay: parseInt(e.target.value)})} className={inputClass} /></div>
+            </div>
+            )}
+            <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsClientModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Salvar</button></div>
+        </form>
+      </BaseModal>
+
+      {/* 4. Financial Modal */}
+      <BaseModal
+        isOpen={isFinancialModalOpen}
+        onClose={() => setIsFinancialModalOpen(false)}
+        title={
+            <div className="flex flex-col">
+                <span className="flex items-center gap-2"><DollarSign size={20} className="text-green-600"/> Financeiro</span>
+                <span className="text-sm font-normal text-slate-500">{selectedClient?.name}</span>
+            </div>
+        }
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-6">
+            {/* Input Form */}
+            <form onSubmit={handlePaymentSubmit} className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Descrição</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ex: Mensalidade, Serviço Extra" 
+                                value={paymentFormData.description} 
+                                onChange={e => setPaymentFormData({...paymentFormData, description: e.target.value})} 
+                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valor (R$)</label>
+                            <input 
+                                type="number" 
+                                required 
+                                placeholder="0,00" 
+                                value={paymentFormData.value || ''} 
+                                onChange={e => setPaymentFormData({...paymentFormData, value: parseFloat(e.target.value)})} 
+                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-400" 
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Comprovante (Google Drive)</label>
+                            <label className={`
+                                flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer w-full transition-colors h-[42px]
+                                ${paymentFormData.receiptUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-300 bg-white hover:border-blue-400 text-slate-500 hover:bg-slate-50'}
+                            `}>
+                                {isUploading ? <Loader2 size={16} className="animate-spin text-blue-600" /> : (paymentFormData.receiptUrl ? <CheckCircle size={16} className="text-green-600"/> : <UploadCloud size={16} />)}
+                                <span className="text-sm truncate font-medium">
+                                    {isUploading ? 'Enviando...' : (paymentFormData.receiptUrl ? 'Arquivo Pronto' : 'Upload PDF/Imagem')}
+                                </span>
+                                <input 
+                                    type="file" 
+                                    accept="application/pdf,image/*" 
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                    disabled={isUploading}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="flex gap-4 items-end">
+                            <div className="flex-1">
+                                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Mês de Referência</label>
+                                <div className="flex gap-2">
+                                    <select 
+                                        value={paymentFormData.month} 
+                                        onChange={e => setPaymentFormData({...paymentFormData, month: e.target.value})}
+                                        className="flex-1 px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        {fullMonths.map((m, i) => (
+                                            <option key={i} value={i}>{m}</option>
+                                        ))}
+                                    </select>
+                                    <div className="px-3 py-2 bg-slate-200 text-slate-600 font-bold rounded-lg border border-slate-300">
+                                        {selectedYear}
+                                    </div>
+                                </div>
+                            </div>
+                            <button 
+                                type="submit" 
+                                disabled={isUploading}
+                                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-bold shadow-md transition-all h-[42px]"
+                            >
+                                Adicionar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900">Remover Anexo</h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Deseja desvincular o comprovante?
-                  </p>
+            </form>
+
+            {/* History Grid */}
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Histórico Anual</h4>
+                    <div className="flex items-center gap-3 bg-slate-100 p-1 rounded-lg">
+                        <button onClick={() => setSelectedYear(y => y-1)} className="p-1 hover:bg-white rounded shadow-sm text-slate-500 font-bold px-2">&lt;</button>
+                        <span className="font-bold text-slate-800 text-sm">{selectedYear}</span>
+                        <button onClick={() => setSelectedYear(y => y+1)} className="p-1 hover:bg-white rounded shadow-sm text-slate-500 font-bold px-2">&gt;</button>
+                    </div>
                 </div>
-                <button onClick={() => setAttachmentToDelete(null)} className="ml-auto text-slate-400 hover:text-slate-700"><X size={20} /></button>
-              </div>
-              <div className="p-6">
-                <p className="text-slate-600 text-sm mb-4">
-                  O valor do pagamento será mantido, mas o link para o arquivo no Drive será removido deste registro.
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => setAttachmentToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                  <button onClick={confirmRemoveAttachment} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Remoção</button>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {months.map((month, index) => {
+                        const payment = getPaymentForMonth(index);
+                        const isPaid = payment?.status === 'paid';
+                        const statusColor = isPaid 
+                            ? 'bg-green-50 border-green-200 text-green-700 shadow-sm' 
+                            : (payment ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-slate-200 text-slate-400 border-dashed');
+                        
+                        return (
+                            <div 
+                                key={month} 
+                                onClick={() => handleTogglePaymentStatus(index)}
+                                className={`relative p-3 rounded-xl border flex flex-col items-center justify-between min-h-[120px] transition-all hover:scale-[1.02] cursor-pointer group ${statusColor}`}
+                            >
+                                <div className="flex justify-between w-full items-start">
+                                    <span className="text-xs font-bold uppercase tracking-wider opacity-70">{month}</span>
+                                    {isPaid && <CheckCircle size={14} className="text-green-600" />}
+                                </div>
+
+                                <div className="flex-1 flex flex-col justify-center items-center py-2">
+                                    {payment ? (
+                                        <span className="text-sm font-mono font-bold tracking-tight">{formatCurrency(payment.value)}</span>
+                                    ) : (
+                                        <span className="text-xs opacity-40">-</span>
+                                    )}
+                                </div>
+
+                                <div className="w-full h-7 flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                    {payment?.receiptUrl && (
+                                        <>
+                                            <a 
+                                                href={payment.receiptUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-white/60 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-transparent hover:border-blue-200 transition-all shadow-sm"
+                                                title="Abrir Comprovante"
+                                            >
+                                                <FileText size={12} />
+                                                <span>Ver Doc</span>
+                                            </a>
+                                            <button 
+                                                onClick={(e) => handleRemoveAttachmentRequest(e, payment)}
+                                                className="w-6 h-6 flex items-center justify-center rounded-full bg-white/60 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shadow-sm"
+                                                title="Excluir Comprovante"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-              </div>
-           </div>
+            </div>
         </div>
-      )}
+      </BaseModal>
     </div>
   );
 };

@@ -18,11 +18,10 @@ const getEnvVar = (key: string) => {
 const API_KEY = getEnvVar('VITE_GOOGLE_API_KEY');
 const CLIENT_ID = getEnvVar('VITE_GOOGLE_CLIENT_ID');
 
-// ID Fixo da pasta de destino para evitar buscas desnecessárias
+// ID Fixo da pasta de destino
 const TARGET_FOLDER_ID = '1cWSxDO4_U2-nUP-oP5RncVoBMRqJ-l1N';
 
-// Deixamos vazio para evitar o erro 502 na carga dos docs. 
-// Como usamos fetch direto para o upload, não precisamos da biblioteca client.drive carregada.
+// Deixamos vazio para evitar o erro 502 na carga dos docs, pois usamos fetch direto.
 const DISCOVERY_DOCS: string[] = []; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -51,7 +50,7 @@ class GoogleDriveService {
                   return;
               }
 
-              // Inicialização básica do GAPI Client (sem discovery docs para evitar 502)
+              // Inicialização básica do GAPI Client
               await window.gapi.client.init({
                 apiKey: API_KEY,
                 discoveryDocs: DISCOVERY_DOCS,
@@ -64,13 +63,14 @@ class GoogleDriveService {
                 this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                   client_id: CLIENT_ID,
                   scope: SCOPES,
-                  callback: '', // Callback dinâmico
+                  callback: '', // Callback dinâmico será injetado no momento da auth
                 });
               }
               resolve();
             } catch (error: any) {
               console.error('Falha na inicialização do GAPI:', error);
-              reject(error);
+              // Resolvemos para não travar a aplicação, mas logamos o erro
+              resolve();
             }
           });
         } else {
@@ -106,13 +106,12 @@ class GoogleDriveService {
             console.error("Erro Auth:", resp);
             reject(resp);
         } else {
-            console.log("Permissão concedida.");
             resolve();
         }
       };
       
-      const existingToken = window.gapi.client.getToken();
-      // Solicita consentimento se não houver token, ou usa prompt vazio para refresh silencioso
+      // Solicita consentimento se não houver token válido
+      const existingToken = window.gapi?.client?.getToken();
       this.tokenClient.requestAccessToken({ prompt: existingToken ? '' : 'consent' });
   }
 
@@ -125,12 +124,10 @@ class GoogleDriveService {
     // 2. Verificação de Token
     const token = window.gapi.client.getToken();
     if (!token) {
-        console.log("Token não encontrado, solicitando login...");
         await this.handleAuthClick();
     }
 
     const executeUpload = async () => {
-        // Metadados com a pasta fixa
         const metadata = {
             name: `Comprovante_${Date.now()}_${file.name}`,
             parents: [TARGET_FOLDER_ID] 
@@ -142,7 +139,7 @@ class GoogleDriveService {
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', file);
 
-        // Upload Multipart direto via Fetch
+        // Upload Multipart direto via Fetch (mais robusto que a lib client para arquivos)
         const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
             method: 'POST',
             headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
@@ -155,7 +152,7 @@ class GoogleDriveService {
         }
 
         const data = await res.json();
-        return data.webViewLink; // Retorna o link de visualização para o frontend
+        return data.webViewLink;
     };
 
     try {
@@ -165,19 +162,16 @@ class GoogleDriveService {
         
         const errorCode = error.status || error.code;
         
-        // Se for erro de permissão (401/403) ou "Insufficient Permission"
+        // Trata erro de permissão pedindo novo token
         if (errorCode === 401 || errorCode === 403 || (error.error?.message && error.error.message.includes('Permission'))) {
-             console.log("Permissão necessária. Solicitando consentimento...");
              if (this.tokenClient) {
-                 // Força o prompt de consentimento para garantir o escopo drive.file
                  this.tokenClient.requestAccessToken({ prompt: 'consent' });
                  throw new Error("Permissão necessária: Por favor, autorize o acesso na janela pop-up e tente enviar novamente.");
              }
         }
         
-        // Se o erro for 404, a pasta fixa pode não existir ou o usuário não tem acesso a ela
         if (errorCode === 404) {
-            throw new Error("Pasta de destino não encontrada ou sem permissão de acesso. Verifique o ID da pasta.");
+            throw new Error("Pasta de destino não encontrada (Erro 404). Verifique se o ID da pasta está correto.");
         }
 
         throw new Error(`Erro Google Drive: ${error.error?.message || error.message || 'Desconhecido'}`);
