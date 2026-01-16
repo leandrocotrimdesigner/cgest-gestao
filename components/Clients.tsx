@@ -179,20 +179,22 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
     setIsUploading(true);
     try {
-       // Inicializa cliente se necessário para garantir APIs carregadas
+       // Garante inicialização do cliente
        await googleDriveService.initClient();
        
        const webViewLink = await googleDriveService.uploadFile(file);
        
-       // Salva URL no estado do formulário para ser usada no submit
+       // VINCULA o link retornado ao estado do formulário
        setNewPaymentData(prev => ({ ...prev, receiptUrl: webViewLink }));
-       alert("Comprovante enviado com sucesso para pasta 'Comprovantes_CGest'!");
+       alert("Upload concluído! O comprovante foi vinculado.");
     } catch (error: any) {
        console.error("Erro no upload", error);
        const msg = error.message || "Erro desconhecido ao enviar arquivo.";
        alert(`Falha no upload: ${msg}`);
     } finally {
        setIsUploading(false);
+       // Limpa o input file para permitir selecionar o mesmo arquivo novamente se necessário
+       e.target.value = '';
     }
   };
 
@@ -212,7 +214,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                   value: Number(newPaymentData.value),
                   // Se o usuário digitou uma nova descrição, usa ela. Senão mantém a antiga.
                   description: newPaymentData.description || existingPayment.description,
-                  // Se o usuário fez upload de novo arquivo, usa ele. Senão mantém o antigo.
+                  // Se o usuário fez upload de novo arquivo (tem receiptUrl no form), usa ele. 
+                  // Caso contrário, mantém o que já existia no banco.
                   receiptUrl: newPaymentData.receiptUrl || existingPayment.receiptUrl,
                   status: 'paid', // Garante status pago ao lançar manualmente
                   paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
