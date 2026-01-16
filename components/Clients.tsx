@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { Client, Payment, ClientStatus } from '../types';
-import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, XCircle, Edit2, Calendar, UploadCloud, Paperclip, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, XCircle, Edit2, Calendar, UploadCloud, Paperclip, Loader2, FileText } from 'lucide-react';
 import { DateSelector } from './DateSelector';
 import { googleDriveService } from '../services/googleDriveService';
+import { useToast } from './ToastContext';
 
 interface ClientsProps {
   clients: Client[];
@@ -16,6 +17,7 @@ interface ClientsProps {
 }
 
 const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, onUpdateClient, onDeleteClient, onAddPayment, onUpdatePayment }) => {
+  const { addToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFinancialModalOpen, setIsFinancialModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -26,6 +28,9 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   // States for Deletion (Meta Style)
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
+  // State for Attachment Deletion
+  const [attachmentToDelete, setAttachmentToDelete] = useState<Payment | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
@@ -46,7 +51,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
     return matchesSearch && matchesStatus && !deletedIds.has(c.id);
   });
 
-  // Handle Delete Request (Opens Modal)
+  // Handle Delete Client Request
   const handleDeleteRequest = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation();
     e.preventDefault();
@@ -54,10 +59,9 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
     setDeleteConfirmationText('');
   };
 
-  // Confirm Delete (Called by Modal)
+  // Confirm Client Delete
   const confirmDelete = async () => {
     if (clientToDelete) {
-        // Optimistic Update
         setDeletedIds(prev => {
             const next = new Set(prev);
             next.add(clientToDelete.id);
@@ -66,18 +70,42 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
         try {
             await onDeleteClient(clientToDelete.id);
+            addToast({ type: 'success', title: 'Cliente removido' });
         } catch (error) {
-            // Rollback
             setDeletedIds(prev => {
                 const next = new Set(prev);
                 next.delete(clientToDelete.id);
                 return next;
             });
-            alert("Erro ao excluir cliente.");
+            addToast({ type: 'error', title: 'Erro ao excluir', message: 'Tente novamente.' });
         } finally {
             setClientToDelete(null);
         }
     }
+  };
+
+  // Handle Attachment Delete Request
+  const handleRemoveAttachmentRequest = (e: React.MouseEvent, payment: Payment) => {
+    e.stopPropagation(); // Prevent toggling payment status
+    setAttachmentToDelete(payment);
+  };
+
+  // Confirm Attachment Delete
+  const confirmRemoveAttachment = async () => {
+      if (attachmentToDelete && onUpdatePayment) {
+          try {
+              // Updates payment keeping all data except receiptUrl
+              await onUpdatePayment({
+                  ...attachmentToDelete,
+                  receiptUrl: '' // Clears the link
+              });
+              addToast({ type: 'success', title: 'Anexo removido', message: 'O vínculo foi desfeito com sucesso.' });
+          } catch (error) {
+              addToast({ type: 'error', title: 'Erro', message: 'Não foi possível remover o anexo.' });
+          } finally {
+              setAttachmentToDelete(null);
+          }
+      }
   };
 
   const getClientFinancialStatus = (client: Client) => {
@@ -140,8 +168,10 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
             ...editingClient,
             ...payload
         });
+        addToast({ type: 'success', title: 'Cliente atualizado' });
     } else {
         await onAddClient(payload);
+        addToast({ type: 'success', title: 'Cliente adicionado' });
     }
     
     setIsModalOpen(false);
@@ -179,21 +209,15 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
     setIsUploading(true);
     try {
-       // Garante inicialização do cliente
        await googleDriveService.initClient();
-       
        const webViewLink = await googleDriveService.uploadFile(file);
-       
-       // VINCULA o link retornado ao estado do formulário
        setNewPaymentData(prev => ({ ...prev, receiptUrl: webViewLink }));
-       alert("Upload concluído! O comprovante foi vinculado.");
+       addToast({ type: 'success', title: 'Upload Concluído', message: 'O comprovante foi salvo no Drive e vinculado.' });
     } catch (error: any) {
        console.error("Erro no upload", error);
-       const msg = error.message || "Erro desconhecido ao enviar arquivo.";
-       alert(`Falha no upload: ${msg}`);
+       addToast({ type: 'error', title: 'Falha no Upload', message: error.message || "Erro desconhecido." });
     } finally {
        setIsUploading(false);
-       // Limpa o input file para permitir selecionar o mesmo arquivo novamente se necessário
        e.target.value = '';
     }
   };
@@ -203,46 +227,40 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       if(selectedClient && onAddPayment && onUpdatePayment) {
           const monthIndex = parseInt(newPaymentData.month);
           const year = selectedYear;
-
-          // Assunto A3: Verifica se já existe pagamento para este mês/ano
           const existingPayment = getPaymentForMonth(monthIndex);
 
-          if (existingPayment) {
-              // UPDATE (Sobreposição)
-              await onUpdatePayment({
-                  ...existingPayment,
-                  value: Number(newPaymentData.value),
-                  // Se o usuário digitou uma nova descrição, usa ela. Senão mantém a antiga.
-                  description: newPaymentData.description || existingPayment.description,
-                  // Se o usuário fez upload de novo arquivo (tem receiptUrl no form), usa ele. 
-                  // Caso contrário, mantém o que já existia no banco.
-                  receiptUrl: newPaymentData.receiptUrl || existingPayment.receiptUrl,
-                  status: 'paid', // Garante status pago ao lançar manualmente
-                  paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
-              });
-              alert("Lançamento atualizado com sucesso!");
-          } else {
-              // INSERT (Novo)
-              const day = '10'; 
-              const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
-              
-              await onAddPayment({
-                  clientId: selectedClient.id,
-                  value: Number(newPaymentData.value),
-                  description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
-                  dueDate: dateStr,
-                  status: 'paid',
-                  paidAt: dateStr,
-                  receiptUrl: newPaymentData.receiptUrl
-              });
+          try {
+            if (existingPayment) {
+                await onUpdatePayment({
+                    ...existingPayment,
+                    value: Number(newPaymentData.value),
+                    description: newPaymentData.description || existingPayment.description,
+                    receiptUrl: newPaymentData.receiptUrl || existingPayment.receiptUrl,
+                    status: 'paid',
+                    paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
+                });
+                addToast({ type: 'success', title: 'Lançamento atualizado!', message: 'Os dados foram sobrepostos com sucesso.' });
+            } else {
+                const day = '10'; 
+                const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
+                await onAddPayment({
+                    clientId: selectedClient.id,
+                    value: Number(newPaymentData.value),
+                    description: newPaymentData.description || `Pagamento ${months[monthIndex]}/${year}`,
+                    dueDate: dateStr,
+                    status: 'paid',
+                    paidAt: dateStr,
+                    receiptUrl: newPaymentData.receiptUrl
+                });
+                addToast({ type: 'success', title: 'Pagamento registrado!' });
+            }
+            setNewPaymentData(prev => ({ ...prev, description: '', receiptUrl: '' }));
+          } catch (e) {
+              addToast({ type: 'error', title: 'Erro ao salvar', message: 'Não foi possível registrar o pagamento.' });
           }
-          
-          // Reset description and file but keep value for ease of entry
-          setNewPaymentData(prev => ({ ...prev, description: '', receiptUrl: '' }));
       }
   };
 
-  // Grid click toggles payment status
   const handleMonthClick = async (monthIndex: number) => {
       if (!selectedClient || !onAddPayment || !onUpdatePayment) return;
       const existingPayment = getPaymentForMonth(monthIndex);
@@ -255,7 +273,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
               paidAt: newStatus === 'paid' ? new Date().toISOString().split('T')[0] : undefined 
           });
       } else {
-          // If clicking an empty box, treat as creating a paid payment for that month
           const dueDay = selectedClient.dueDay || 10; 
           const date = new Date(selectedYear, monthIndex, dueDay);
           const year = date.getFullYear();
@@ -544,7 +561,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {months.map((month, index) => {
                             const payment = getPaymentForMonth(index);
                             const isPaid = payment?.status === 'paid';
@@ -556,27 +573,45 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                 <button 
                                     key={month} 
                                     onClick={() => handleMonthClick(index)} 
-                                    className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] relative group ${statusColor}`}
+                                    className={`relative p-3 rounded-xl border flex flex-col items-center justify-between min-h-[110px] transition-all hover:scale-[1.02] group ${statusColor}`}
                                 >
-                                    {payment?.receiptUrl && (
-                                        <a 
-                                            href={payment.receiptUrl} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-blue-600 text-blue-600 hover:text-white rounded-full transition-colors z-10 shadow-sm"
-                                            title="Ver Comprovante (Drive)"
-                                        >
-                                            <Paperclip size={14} />
-                                        </a>
-                                    )}
-                                    <span className="text-sm font-bold uppercase">{month}</span>
-                                    {payment ? (
-                                        <span className="text-xs font-mono font-semibold">{formatCurrency(payment.value)}</span>
-                                    ) : (
-                                        <span className="text-xs opacity-50">-</span>
-                                    )}
-                                    {isPaid && <CheckCircle size={12} className="opacity-50" />}
+                                    <div className="flex justify-between w-full items-start">
+                                        <span className="text-xs font-bold uppercase tracking-wider opacity-70">{month}</span>
+                                        {isPaid && <CheckCircle size={14} className="text-green-600" />}
+                                    </div>
+
+                                    <div className="flex-1 flex flex-col justify-center items-center py-2">
+                                        {payment ? (
+                                            <span className="text-sm font-mono font-bold tracking-tight">{formatCurrency(payment.value)}</span>
+                                        ) : (
+                                            <span className="text-xs opacity-40">-</span>
+                                        )}
+                                    </div>
+
+                                    <div className="w-full h-6 flex items-center justify-center gap-1">
+                                        {payment?.receiptUrl && (
+                                            <>
+                                                <a 
+                                                    href={payment.receiptUrl} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-white/50 hover:bg-white text-slate-600 hover:text-blue-600 border border-transparent hover:border-blue-200 transition-all shadow-sm group-hover:shadow"
+                                                    title="Abrir Comprovante"
+                                                >
+                                                    <FileText size={12} />
+                                                    <span>Ver Doc</span>
+                                                </a>
+                                                <div 
+                                                    onClick={(e) => handleRemoveAttachmentRequest(e, payment)}
+                                                    className="flex items-center justify-center w-6 h-6 rounded-full bg-white/50 hover:bg-red-50 text-slate-400 hover:text-red-600 border border-transparent hover:border-red-100 transition-colors shadow-sm cursor-pointer"
+                                                    title="Excluir Comprovante"
+                                                >
+                                                    <Trash2 size={10} />
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </button>
                             );
                         })}
@@ -584,6 +619,35 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                 </div>
             </div>
          </div>
+      )}
+
+      {/* CONFIRMATION MODAL FOR ATTACHMENT DELETION */}
+      {attachmentToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setAttachmentToDelete(null)}>
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-start gap-4">
+                <div className="p-2 bg-slate-200 rounded-full text-slate-600">
+                  <FileText size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Remover Anexo</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    Deseja desvincular o comprovante?
+                  </p>
+                </div>
+                <button onClick={() => setAttachmentToDelete(null)} className="ml-auto text-slate-400 hover:text-slate-700"><X size={20} /></button>
+              </div>
+              <div className="p-6">
+                <p className="text-slate-600 text-sm mb-4">
+                  O valor do pagamento será mantido, mas o link para o arquivo no Drive será removido deste registro.
+                </p>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setAttachmentToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                  <button onClick={confirmRemoveAttachment} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Remoção</button>
+                </div>
+              </div>
+           </div>
+        </div>
       )}
     </div>
   );

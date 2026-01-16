@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { User as UserIcon, Mail, Lock, Save, Shield, Camera, Download, Upload, Trash2, AlertTriangle, X } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { useToast } from './ToastContext';
 
 interface ProfileProps {
   user: User;
@@ -10,12 +11,17 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
+  const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar || null);
   
   // States for Security Modal
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+
+  // States for Backup Import Modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [pendingBackupData, setPendingBackupData] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     name: user.name || '',
@@ -51,10 +57,10 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
             name: formData.name,
             avatar: avatarPreview || undefined 
         });
-        alert('Perfil atualizado com sucesso!');
+        addToast({ type: 'success', title: 'Perfil Atualizado', message: 'Suas informações foram salvas com sucesso.' });
         setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
     } catch (error) {
-        alert('Erro ao atualizar perfil.');
+        addToast({ type: 'error', title: 'Erro', message: 'Não foi possível salvar as alterações.' });
     } finally {
         setIsLoading(false);
     }
@@ -74,12 +80,13 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          addToast({ type: 'success', title: 'Exportação Concluída', message: 'O arquivo foi baixado com sucesso.' });
       } catch (error) {
-          alert('Erro ao exportar dados.');
+          addToast({ type: 'error', title: 'Erro na Exportação', message: 'Tente novamente mais tarde.' });
       }
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -91,39 +98,48 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
 
               const json = JSON.parse(content);
               
-              // Validação básica para garantir que é um backup do CGest
+              // Validação básica
               if (!json.timestamp && (!json.clients && !json.projects)) {
                   throw new Error("Formato de arquivo inválido");
               }
 
-              if (confirm('ATENÇÃO: Isso substituirá seus dados atuais pelos dados do backup. Deseja continuar?')) {
-                  await dataService.restoreBackupData(json);
-                  alert('Importação Concluída!');
-                  window.location.reload();
-              }
+              // Armazena dados temporariamente e abre modal de confirmação
+              setPendingBackupData(json);
+              setIsImportModalOpen(true);
           } catch (error) {
-              console.error(error);
-              alert('Arquivo de backup inválido ou corrompido.');
+              addToast({ type: 'error', title: 'Arquivo Inválido', message: 'O arquivo selecionado não é um backup válido do CGest.' });
           }
       };
       reader.readAsText(file);
-      // Reset input para permitir selecionar o mesmo arquivo novamente se necessário
-      e.target.value = '';
+      e.target.value = ''; // Reset input
+  };
+
+  const confirmImport = async () => {
+      if (pendingBackupData) {
+          try {
+              await dataService.restoreBackupData(pendingBackupData);
+              addToast({ type: 'success', title: 'Importação Concluída', message: 'Sistema recarregando...' });
+              setTimeout(() => window.location.reload(), 1500);
+          } catch (e) {
+              addToast({ type: 'error', title: 'Erro na Restauração', message: 'Houve um problema ao processar os dados.' });
+          }
+      }
+      setIsImportModalOpen(false);
+      setPendingBackupData(null);
   };
 
   // --- CLEAR DATA LOGIC ---
   const handleConfirmClear = () => {
       if (deletePassword === 'admin123') {
           try {
-              // Limpeza direta do localStorage conforme solicitado para evitar problemas de roteamento
               localStorage.clear();
-              alert('Sistema resetado com sucesso! A página será recarregada.');
-              window.location.reload();
+              addToast({ type: 'success', title: 'Sistema Resetado', message: 'Recarregando aplicação...' });
+              setTimeout(() => window.location.reload(), 1500);
           } catch (e) {
-              alert('Erro ao limpar dados.');
+              addToast({ type: 'error', title: 'Erro', message: 'Falha ao limpar dados.' });
           }
       } else {
-          alert('Senha Incorreta!');
+          addToast({ type: 'error', title: 'Acesso Negado', message: 'Senha de administrador incorreta.' });
           setDeletePassword('');
       }
   };
@@ -243,7 +259,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                           
                           <label className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer">
                               <Upload size={16} /> Importar Backup
-                              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+                              <input type="file" accept=".json" onChange={handleFileSelect} className="hidden" />
                           </label>
                       </div>
                   </div>
@@ -311,6 +327,42 @@ const Profile: React.FC<ProfileProps> = ({ user, onUpdateUser }) => {
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md transition-all"
                   >
                     Confirmar Limpeza
+                  </button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* IMPORT CONFIRMATION MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setIsImportModalOpen(false)}>
+           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="p-6 bg-blue-50 border-b border-blue-100 flex items-start gap-4">
+                <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                  <Upload size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-blue-900">Importar Backup</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Atenção: Isso substituirá os dados atuais.
+                  </p>
+                </div>
+                <button onClick={() => setIsImportModalOpen(false)} className="ml-auto text-blue-400 hover:text-blue-700"><X size={20} /></button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <p className="text-slate-600 text-sm">
+                  Você está prestes a restaurar um backup. Todos os clientes, projetos e tarefas atuais serão <b>substituídos</b> pelos dados do arquivo. Deseja continuar?
+                </p>
+                
+                <div className="flex justify-end gap-3 pt-2">
+                  <button onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                  <button 
+                    onClick={confirmImport}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-md transition-all"
+                  >
+                    Confirmar Importação
                   </button>
                 </div>
               </div>
