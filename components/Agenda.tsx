@@ -26,9 +26,10 @@ const Agenda: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   useEffect(() => {
-    // CORREÇÃO DEFINITIVA: Leitura via import.meta.env
-    const clientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
-    const apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY;
+    // Leitura segura via import.meta.env
+    const env = (import.meta as any).env || {};
+    const clientId = env.VITE_GOOGLE_CLIENT_ID;
+    const apiKey = env.VITE_GOOGLE_API_KEY;
     
     // Debug para verificar carregamento (Remover em produção se desejar)
     console.log('Status Env Vars:', { 

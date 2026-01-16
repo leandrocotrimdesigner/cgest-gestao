@@ -1,11 +1,17 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+// Acesso seguro ao objeto env: se (import.meta as any).env for undefined, usa {}
+const env = (import.meta as any).env || {};
+const supabaseUrl = env.VITE_SUPABASE_URL;
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error("Variáveis de ambiente do Supabase não encontradas.");
+// Validação para evitar travamento da aplicação (White Screen)
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Atenção: Credenciais do Supabase não encontradas. Verifique o arquivo .env.local.");
 }
 
-export const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
+// Exporta null se as chaves não existirem, evitando que o createClient lance erro
+export const supabase = (supabaseUrl && supabaseAnonKey)
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
