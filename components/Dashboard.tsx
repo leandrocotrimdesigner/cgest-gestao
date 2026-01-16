@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Client, Project, Goal, Task, Payment } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock } from 'lucide-react';
+import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock, MessageCircle } from 'lucide-react';
 import Goals from './Goals'; // Reusing the Goals component
 
 interface DashboardProps {
@@ -113,6 +113,29 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
         });
         setAlertToDelete(null);
     }
+  };
+
+  // --- WHATSAPP CHARGE LOGIC ---
+  const handleWhatsAppCharge = (e: React.MouseEvent, payment: Payment) => {
+      e.stopPropagation();
+      const client = clients.find(c => c.id === payment.clientId);
+      
+      if (!client || !client.whatsapp) {
+          alert("Este cliente não possui um número de WhatsApp cadastrado. Edite o cliente para adicionar.");
+          return;
+      }
+
+      // Limpa caracteres não numéricos
+      const phone = client.whatsapp.replace(/\D/g, '');
+      
+      const formattedDate = new Date(payment.dueDate).toLocaleDateString('pt-BR');
+      const formattedValue = formatCurrency(payment.value);
+      const description = payment.description || 'serviços prestados';
+
+      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: [SUA CHAVE PIX AQUI].`;
+      
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
   };
 
   const handleBarClick = (data: any) => {
@@ -272,13 +295,24 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                                     <span className="font-bold text-red-700">{formatCurrency(payment.value)}</span>
                                 </div>
                             </div>
-                            <button 
-                                type="button"
-                                onClick={(e) => handleDeleteAlertRequest(e, payment.id)}
-                                className="text-slate-300 hover:text-red-500 p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                                <Trash2 size={16} />
-                            </button>
+                            {/* Ações: WhatsApp + Excluir */}
+                            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    type="button"
+                                    onClick={(e) => handleWhatsAppCharge(e, payment)}
+                                    className="text-green-600 bg-white hover:bg-green-100 p-1.5 rounded-md shadow-sm transition-colors border border-green-200"
+                                    title="Cobrar via WhatsApp"
+                                >
+                                    <MessageCircle size={14} />
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={(e) => handleDeleteAlertRequest(e, payment.id)}
+                                    className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
                     ))
                 ) : (

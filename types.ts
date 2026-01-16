@@ -5,6 +5,7 @@ export type ClientStatus = 'active' | 'inactive';
 export interface Client {
   id: string;
   name: string;
+  whatsapp?: string; // Novo campo para cobrança
   type: ClientType;
   status: ClientStatus;
   monthlyValue?: number; // Only for 'mensalista'

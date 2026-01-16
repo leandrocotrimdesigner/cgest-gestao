@@ -37,7 +37,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   
   // Forms State
-  const [clientFormData, setClientFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5 });
+  const [clientFormData, setClientFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5, whatsapp: '' });
   const [paymentFormData, setPaymentFormData] = useState({ value: 0, description: '', month: '', receiptUrl: '' });
   const [isUploading, setIsUploading] = useState(false);
 
@@ -84,7 +84,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   
   const handleOpenAddClient = () => {
     setEditingClient(null);
-    setClientFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5 });
+    setClientFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5, whatsapp: '' });
     setIsClientModalOpen(true);
   };
 
@@ -96,7 +96,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         type: client.type,
         status: client.status,
         monthlyValue: client.monthlyValue || 0,
-        dueDay: client.dueDay || 5
+        dueDay: client.dueDay || 5,
+        whatsapp: client.whatsapp || ''
     });
     setIsClientModalOpen(true);
   };
@@ -107,6 +108,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
     const payload = {
       name: clientFormData.name,
+      whatsapp: clientFormData.whatsapp,
       type: clientFormData.type as 'mensalista' | 'avulso',
       status: clientFormData.status as 'active' | 'inactive',
       monthlyValue: clientFormData.type === 'mensalista' ? Number(clientFormData.monthlyValue) : undefined,
@@ -384,6 +386,19 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         <form onSubmit={handleClientSubmit} className="space-y-4">
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome</label><input required type="text" value={clientFormData.name || ''} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} className={inputClass} /></div>
             
+            {/* NOVO CAMPO WHATSAPP */}
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp</label>
+                <input 
+                    type="text" 
+                    placeholder="5511999999999"
+                    value={clientFormData.whatsapp || ''} 
+                    onChange={e => setClientFormData({...clientFormData, whatsapp: e.target.value})} 
+                    className={inputClass} 
+                />
+                <p className="text-xs text-slate-400 mt-1">Formato: DDI + DDD + Número (apenas números)</p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Tipo de Contrato</label>

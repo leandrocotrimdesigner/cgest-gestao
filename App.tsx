@@ -30,26 +30,38 @@ function App() {
 
   // Auth & Session Persistence Logic
   useEffect(() => {
-    // 1. Check initial session
+    let mounted = true;
+
+    // Timeout de segurança: Se o Supabase demorar mais de 3s, libera a UI
+    const safetyTimeout = setTimeout(() => {
+        if (mounted && isLoading) {
+            console.warn("Supabase timeout: Forcing UI load.");
+            setIsLoading(false);
+        }
+    }, 3000);
+
     const checkSession = async () => {
       try {
         const currentUser = await dataService.getCurrentUser();
-        if (currentUser) {
+        if (mounted && currentUser) {
             setUser(currentUser);
         }
       } catch (error) {
         console.error("Session check failed", error);
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
+        clearTimeout(safetyTimeout);
       }
     };
     checkSession();
 
-    // 2. Listen for auth changes
+    // Listen for auth changes
+    let subscription: any = null;
     if (supabase) {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const authData = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!mounted) return;
+            
             if (event === 'SIGNED_IN' && session?.user) {
-                // Recupera o usuário formatado pelo dataService
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
             } else if (event === 'SIGNED_OUT') {
@@ -57,10 +69,16 @@ function App() {
                 setClients([]); setProjects([]); setGoals([]); setTasks([]); setPayments([]);
             }
         });
-        return () => subscription.unsubscribe();
+        subscription = authData.data.subscription;
     } else {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
     }
+
+    return () => {
+        mounted = false;
+        clearTimeout(safetyTimeout);
+        if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   // Fetch data only when user is authenticated
