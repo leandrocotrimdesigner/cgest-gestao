@@ -366,7 +366,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                 );
               })}
               {displayedClients.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhum cliente encontrado.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhum cliente encontrado</td></tr>
               )}
             </tbody>
           </table>

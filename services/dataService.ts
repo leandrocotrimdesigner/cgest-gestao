@@ -12,32 +12,14 @@ const getPastDate = (days: number) => {
 }
 
 // --- MOCK DATA ---
-const MOCK_CLIENTS: Client[] = [
-  { id: '1', name: 'Tech Solutions Ltda', type: 'mensalista', status: 'active', monthlyValue: 2500, dueDay: 5, createdAt: new Date().toISOString() },
-  { id: '2', name: 'Padaria do João', type: 'avulso', status: 'active', dueDay: 10, createdAt: new Date().toISOString() },
-  { id: '3', name: 'Marketing Digital Pro', type: 'mensalista', status: 'inactive', monthlyValue: 5000, dueDay: 20, createdAt: new Date().toISOString() },
-];
+// Dados iniciais vazios para garantir que o sistema comece limpo (sem dados fantasmas)
+const MOCK_CLIENTS: Client[] = [];
+const MOCK_PROJECTS: Project[] = [];
+const MOCK_GOALS: Goal[] = [];
+const MOCK_TASKS: Task[] = [];
+const MOCK_PAYMENTS: Payment[] = [];
 
-const MOCK_PROJECTS: Project[] = [
-  { id: '101', clientId: '1', name: 'Manutenção Mensal Site', status: 'in_progress', paymentStatus: 'paid', paidAt: getPastDate(1), budget: 2500, createdAt: new Date().toISOString() },
-  { id: '102', clientId: '2', name: 'Logo e Identidade Visual', status: 'completed', paymentStatus: 'paid', paidAt: getPastDate(3), budget: 1500, createdAt: new Date().toISOString() },
-  { id: '103', clientId: '3', name: 'Gestão de Tráfego', status: 'in_progress', paymentStatus: 'pending', budget: 5000, createdAt: new Date().toISOString() },
-];
-
-const MOCK_GOALS: Goal[] = [
-  { id: 'g1', description: 'Faturamento Anual 100k', targetValue: 100000, currentValue: 45000, deadline: '2024-12-31' },
-];
-
-const MOCK_TASKS: Task[] = [
-  { id: 't1', title: 'Enviar nota fiscal Tech Solutions', isCompleted: false, projectId: '101', dueDate: todayStr, createdAt: new Date().toISOString() },
-  { id: 't2', title: 'Reunião de Alinhamento', isCompleted: false, projectId: '101', dueDate: todayStr, createdAt: new Date().toISOString(), isMeeting: true, meetingTime: '14:00' },
-];
-
-const MOCK_PAYMENTS: Payment[] = [
-    { id: 'p1', clientId: '1', value: 2500, dueDate: getPastDate(2), status: 'paid', paidAt: getPastDate(2), description: 'Mensalidade Abril' },
-    { id: 'p2', clientId: '3', value: 5000, dueDate: getPastDate(5), status: 'pending', description: 'Mensalidade Abril - ATRASADO' },
-];
-
+// Mantemos apenas o usuário para permitir o login no modo Demo
 const MOCK_USER: User = {
     id: 'u1',
     email: 'admin@cgest.com',
