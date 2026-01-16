@@ -29,11 +29,9 @@ const VERSES = [
 const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goals, tasks, onToggleTask, onAddGoal, onDeleteGoal, onUpdateGoal }) => {
   const [todaysVerse, setTodaysVerse] = useState(VERSES[0]);
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
-  
-  // Meta Style Deletion for Alerts
   const [alertToDelete, setAlertToDelete] = useState<string | null>(null);
 
-  // --- Revenue Details State ---
+  // Revenue Details State
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -48,13 +46,8 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
     const totalClients = activeClients.length;
     const activeProjects = projects.filter(p => p.status === 'in_progress').length;
     
-    // MRR = Only recurring clients (Mensalistas) that are ACTIVE
     const mrr = activeClients.filter(c => c.type === 'mensalista').reduce((acc, curr) => acc + (curr.monthlyValue || 0), 0);
-    
-    // Pipeline = Pending Payment Projects (Not yet paid)
     const pipeline = projects.filter(p => p.paymentStatus === 'pending').reduce((acc, curr) => acc + curr.budget, 0);
-    
-    // Realized Project Revenue = Paid Projects
     const projectRevenue = projects.filter(p => p.paymentStatus === 'paid').reduce((acc, curr) => acc + curr.budget, 0);
 
     return { totalClients, activeProjects, mrr, pipeline, projectRevenue };
@@ -68,10 +61,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
         d.setDate(today.getDate() - i);
         const dayStr = d.toISOString().split('T')[0];
         
-        // Sum from Payments (Client Invoices)
         const dailyPayments = payments.filter(p => p.status === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.value, 0);
-        
-        // Sum from Paid Projects (Project Completion)
         const dailyProjects = projects.filter(p => p.paymentStatus === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.budget, 0);
 
         data.push({ 
@@ -106,22 +96,18 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
   const confirmDeleteAlert = () => {
     if (alertToDelete) {
-        setHiddenAlerts(prev => {
-             const next = new Set(prev);
-             next.add(alertToDelete);
-             return next;
-        });
+        setHiddenAlerts(prev => new Set(prev).add(alertToDelete));
         setAlertToDelete(null);
     }
   };
 
-  // --- WHATSAPP CHARGE LOGIC ---
+  // --- WHATSAPP CHARGE LOGIC (Updated PIX) ---
   const handleWhatsAppCharge = (e: React.MouseEvent, payment: Payment) => {
       e.stopPropagation();
       const client = clients.find(c => c.id === payment.clientId);
       
       if (!client || !client.whatsapp) {
-          alert("Este cliente não possui um número de WhatsApp cadastrado. Edite o cliente para adicionar.");
+          alert("Este cliente não possui um número de WhatsApp cadastrado.");
           return;
       }
 
@@ -132,75 +118,43 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
       const formattedValue = formatCurrency(payment.value);
       const description = payment.description || 'serviços prestados';
 
-      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: 62981607346 (Leandro Alves, Mercado Pago).`;
+      // MENSAGEM COM CHAVE PIX CORRETA
+      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: 62981607346 (Leandro Alves).`;
       
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
   };
 
   const handleBarClick = (data: any) => {
-    // Case 1: Clicked on Chart (Recharts passes object with activePayload)
     if (data && data.activePayload && data.activePayload.length > 0) {
-        const payload = data.activePayload[0].payload;
-        if (payload) {
-            setSelectedDate(payload.date);
-            setIsDetailsOpen(true);
-        }
-    }
-    // Case 2: Clicked directly on Bar (Recharts passes the data object itself)
-    else if (data && data.date) {
+        setSelectedDate(data.activePayload[0].payload.date);
+        setIsDetailsOpen(true);
+    } else if (data && data.date) {
         setSelectedDate(data.date);
         setIsDetailsOpen(true);
     }
   };
 
   const openRecentDetails = () => {
-    // Find the last day that has revenue, or default to today
     const lastDayWithRevenue = [...weeklyRevenueData].reverse().find(d => d.revenue > 0);
     const targetDate = lastDayWithRevenue ? lastDayWithRevenue.date : new Date().toISOString().split('T')[0];
-    
     setSelectedDate(targetDate);
     setIsDetailsOpen(true);
   };
 
-  // --- Transactions for Selected Date ---
   const selectedTransactions = useMemo(() => {
     if (!selectedDate) return [];
+    const transactionList: Array<{ id: string; type: 'Receita' | 'Projeto'; clientName: string; description: string; value: number; date: string }> = [];
 
-    const transactionList: Array<{
-        id: string;
-        type: 'Receita' | 'Projeto';
-        clientName: string;
-        description: string;
-        value: number;
-        date: string;
-    }> = [];
-
-    // 1. Add Payments (Clients)
     payments.forEach(p => {
         if (p.status === 'paid' && p.paidAt === selectedDate) {
-            transactionList.push({
-                id: p.id,
-                type: 'Receita',
-                clientName: getClientName(p.clientId),
-                description: p.description || 'Mensalidade/Avulso',
-                value: p.value,
-                date: p.paidAt
-            });
+            transactionList.push({ id: p.id, type: 'Receita', clientName: getClientName(p.clientId), description: p.description || 'Mensalidade/Avulso', value: p.value, date: p.paidAt });
         }
     });
 
-    // 2. Add Projects
     projects.forEach(p => {
         if (p.paymentStatus === 'paid' && p.paidAt === selectedDate) {
-            transactionList.push({
-                id: p.id,
-                type: 'Projeto',
-                clientName: getClientName(p.clientId),
-                description: `Projeto: ${p.name}`,
-                value: p.budget,
-                date: p.paidAt
-            });
+            transactionList.push({ id: p.id, type: 'Projeto', clientName: getClientName(p.clientId), description: `Projeto: ${p.name}`, value: p.budget, date: p.paidAt });
         }
     });
 
@@ -211,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
   return (
     <div className="space-y-6 animate-fadeIn pb-8">
-      {/* 1. Inspiração do Dia (TOPO) */}
+      {/* 1. Inspiração do Dia */}
       <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
@@ -233,53 +187,29 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
         <StatCard title="Projetos Ativos" value={stats.activeProjects} icon={Briefcase} color="text-purple-600" bg="bg-purple-100"/>
       </div>
 
-      {/* 3. CENTRAL GRID (3 COLUMNS) */}
+      {/* 3. CENTRAL GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Coluna 1: Dashboard/Métricas (Gráfico) */}
+        {/* Receita Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <DollarSign size={20} className="text-green-600"/>Receita (7 Dias)
-                </h3>
-                <button 
-                    onClick={openRecentDetails}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"
-                    title="Ver Detalhes"
-                >
-                    <List size={18} />
-                </button>
+                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2"><DollarSign size={20} className="text-green-600"/>Receita (7 Dias)</h3>
+                <button onClick={openRecentDetails} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"><List size={18} /></button>
             </div>
             <div className="flex-1 w-full min-h-0 relative group">
-                {/* Overlay hint */}
-                <div className="absolute top-0 right-0 text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    Clique na barra para detalhes
-                </div>
                 <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <BarChart 
-                        data={weeklyRevenueData} 
-                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        onClick={handleBarClick}
-                        className="cursor-pointer"
-                    >
+                    <BarChart data={weeklyRevenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleBarClick} className="cursor-pointer">
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="name" tick={{fill: '#64748b', fontSize: 10}} axisLine={false} tickLine={false} />
                         <YAxis tickFormatter={(val) => `R$${val}`} tick={{fill: '#64748b', fontSize: 10}} axisLine={false} tickLine={false} />
                         <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value: number) => [formatCurrency(value), 'Receita']} />
-                        <Bar 
-                            dataKey="revenue" 
-                            fill="#2563eb" 
-                            radius={[4, 4, 0, 0]} 
-                            barSize={30} 
-                            cursor="pointer"
-                            onClick={handleBarClick}
-                        />
+                        <Bar dataKey="revenue" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={30} cursor="pointer" onClick={handleBarClick} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
         </div>
 
-        {/* Coluna 2: Alertas Financeiros */}
+        {/* Alertas Financeiros */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
             <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><AlertTriangle size={20} className="text-red-500"/>Alertas</h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
@@ -295,21 +225,11 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                                     <span className="font-bold text-red-700">{formatCurrency(payment.value)}</span>
                                 </div>
                             </div>
-                            {/* Ações: WhatsApp + Excluir */}
                             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    type="button"
-                                    onClick={(e) => handleWhatsAppCharge(e, payment)}
-                                    className="text-green-600 bg-white hover:bg-green-100 p-1.5 rounded-md shadow-sm transition-colors border border-green-200"
-                                    title="Cobrar via WhatsApp"
-                                >
+                                <button type="button" onClick={(e) => handleWhatsAppCharge(e, payment)} className="text-green-600 bg-white hover:bg-green-100 p-1.5 rounded-md shadow-sm transition-colors border border-green-200" title="Cobrar via WhatsApp">
                                     <MessageCircle size={14} />
                                 </button>
-                                <button 
-                                    type="button"
-                                    onClick={(e) => handleDeleteAlertRequest(e, payment.id)}
-                                    className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100"
-                                >
+                                <button type="button" onClick={(e) => handleDeleteAlertRequest(e, payment.id)} className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100">
                                     <Trash2 size={14} />
                                 </button>
                             </div>
@@ -324,7 +244,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
             </div>
         </div>
 
-        {/* Coluna 3: Tarefas de Hoje */}
+        {/* Tarefas de Hoje */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
             <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><CheckSquare size={20} className="text-blue-600"/>Tarefas de Hoje</h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
@@ -333,36 +253,20 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                         const projectName = getProjectName(task.projectId);
                         return (
                             <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-400'}`}>
-                                <button 
-                                    onClick={() => onToggleTask(task.id, !task.isCompleted)}
-                                    className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}
-                                >
+                                <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}>
                                     {task.isCompleted && <Check size={12} strokeWidth={3} />}
                                 </button>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex justify-between items-start">
-                                        <p className={`text-sm font-medium break-words ${task.isCompleted ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                                            {task.title}
-                                        </p>
+                                        <p className={`text-sm font-medium break-words ${task.isCompleted ? 'line-through text-slate-500' : 'text-slate-800'}`}>{task.title}</p>
                                         {task.isMeeting && !task.isCompleted && (
-                                            <div className="ml-2 bg-purple-50 text-purple-600 rounded p-1" title="Reunião">
-                                                <Video size={14} />
-                                            </div>
+                                            <div className="ml-2 bg-purple-50 text-purple-600 rounded p-1" title="Reunião"><Video size={14} /></div>
                                         )}
                                     </div>
-                                    
                                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                                        {projectName && (
-                                            <div className="flex items-center gap-1">
-                                                <Briefcase size={10} className="text-slate-400"/>
-                                                <span className="text-xs text-slate-500 truncate">{projectName}</span>
-                                            </div>
-                                        )}
+                                        {projectName && <div className="flex items-center gap-1"><Briefcase size={10} className="text-slate-400"/><span className="text-xs text-slate-500 truncate">{projectName}</span></div>}
                                         {task.isMeeting && task.meetingTime && !task.isCompleted && (
-                                            <div className="flex items-center gap-1 bg-purple-50 px-1.5 py-0.5 rounded text-purple-700">
-                                                <Clock size={10} />
-                                                <span className="text-xs font-bold">{task.meetingTime}</span>
-                                            </div>
+                                            <div className="flex items-center gap-1 bg-purple-50 px-1.5 py-0.5 rounded text-purple-700"><Clock size={10} /><span className="text-xs font-bold">{task.meetingTime}</span></div>
                                         )}
                                     </div>
                                 </div>
@@ -377,89 +281,50 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
                 )}
             </div>
         </div>
-
       </div>
 
-      {/* 4. METAS (FINAL) */}
+      {/* 4. METAS */}
       <div className="pt-4 border-t border-slate-200">
-        <Goals 
-            goals={goals} 
-            onAddGoal={onAddGoal} 
-            onDeleteGoal={onDeleteGoal} 
-            onUpdateGoal={onUpdateGoal}
-            readOnly={true} 
-        />
+        <Goals goals={goals} onAddGoal={onAddGoal} onDeleteGoal={onDeleteGoal} onUpdateGoal={onUpdateGoal} readOnly={true} />
       </div>
 
-      {/* REVENUE DETAILS MODAL */}
+      {/* MODALS (Revenue Details & Alerts) */}
       {isDetailsOpen && selectedDate && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" onClick={() => setIsDetailsOpen(false)}>
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl animate-fadeIn overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <FileText size={20} className="text-blue-600"/> 
-                        Detalhamento de Receita
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                        {new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={20} className="text-blue-600"/> Detalhamento de Receita</h3>
+                    <p className="text-sm text-slate-500">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
-                  <button onClick={() => setIsDetailsOpen(false)} className="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-200 transition-colors">
-                      <X size={20} />
-                  </button>
+                  <button onClick={() => setIsDetailsOpen(false)} className="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
               </div>
-              
               <div className="p-0 overflow-y-auto">
                 {selectedTransactions.length > 0 ? (
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0">
-                            <tr>
-                                <th className="px-6 py-3 font-semibold">Cliente / Origem</th>
-                                <th className="px-6 py-3 font-semibold">Descrição</th>
-                                <th className="px-6 py-3 font-semibold text-right">Valor</th>
-                            </tr>
-                        </thead>
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider sticky top-0"><tr><th className="px-6 py-3 font-semibold">Cliente / Origem</th><th className="px-6 py-3 font-semibold">Descrição</th><th className="px-6 py-3 font-semibold text-right">Valor</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
                             {selectedTransactions.map((item, idx) => (
                                 <tr key={item.id + idx} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-800">{item.clientName}</div>
-                                        <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                            {item.type === 'Projeto' ? <Briefcase size={10}/> : <Users size={10}/>}
-                                            {item.type}
-                                        </div>
+                                        <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">{item.type === 'Projeto' ? <Briefcase size={10}/> : <Users size={10}/>}{item.type}</div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">
-                                        {item.description}
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-bold text-green-600">
-                                        {formatCurrency(item.value)}
-                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-600">{item.description}</td>
+                                    <td className="px-6 py-4 text-right font-bold text-green-600">{formatCurrency(item.value)}</td>
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-slate-50 border-t border-slate-200">
-                            <tr>
-                                <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-700">Total do Dia:</td>
-                                <td className="px-6 py-4 text-right font-bold text-slate-900 text-lg">
-                                    {formatCurrency(selectedTransactions.reduce((acc, curr) => acc + curr.value, 0))}
-                                </td>
-                            </tr>
-                        </tfoot>
+                        <tfoot className="bg-slate-50 border-t border-slate-200"><tr><td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-700">Total do Dia:</td><td className="px-6 py-4 text-right font-bold text-slate-900 text-lg">{formatCurrency(selectedTransactions.reduce((acc, curr) => acc + curr.value, 0))}</td></tr></tfoot>
                     </table>
                 ) : (
-                    <div className="p-12 text-center text-slate-400 flex flex-col items-center">
-                        <AlertTriangle size={32} className="mb-2 opacity-30" />
-                        <p>Nenhum detalhe encontrado para esta data.</p>
-                    </div>
+                    <div className="p-12 text-center text-slate-400 flex flex-col items-center"><AlertTriangle size={32} className="mb-2 opacity-30" /><p>Nenhum detalhe encontrado para esta data.</p></div>
                 )}
               </div>
            </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal for Alerts */}
       {alertToDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" onClick={() => setAlertToDelete(null)}>
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>

@@ -5,19 +5,6 @@ import { supabase } from './supabaseClient';
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const todayStr = new Date().toISOString().split('T')[0];
 
-const getPastDate = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString().split('T')[0];
-}
-
-// --- MOCK DATA (Fallback apenas para estruturas, não para Auth) ---
-const MOCK_CLIENTS: Client[] = [];
-const MOCK_PROJECTS: Project[] = [];
-const MOCK_GOALS: Goal[] = [];
-const MOCK_TASKS: Task[] = [];
-const MOCK_PAYMENTS: Payment[] = [];
-
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 class DataService {
@@ -33,11 +20,11 @@ class DataService {
   }
 
   private initLocalStore() {
-    if (!localStorage.getItem('cgest_clients')) localStorage.setItem('cgest_clients', JSON.stringify(MOCK_CLIENTS));
-    if (!localStorage.getItem('cgest_projects')) localStorage.setItem('cgest_projects', JSON.stringify(MOCK_PROJECTS));
-    if (!localStorage.getItem('cgest_goals')) localStorage.setItem('cgest_goals', JSON.stringify(MOCK_GOALS));
-    if (!localStorage.getItem('cgest_tasks')) localStorage.setItem('cgest_tasks', JSON.stringify(MOCK_TASKS));
-    if (!localStorage.getItem('cgest_payments')) localStorage.setItem('cgest_payments', JSON.stringify(MOCK_PAYMENTS));
+    if (!localStorage.getItem('cgest_clients')) localStorage.setItem('cgest_clients', '[]');
+    if (!localStorage.getItem('cgest_projects')) localStorage.setItem('cgest_projects', '[]');
+    if (!localStorage.getItem('cgest_goals')) localStorage.setItem('cgest_goals', '[]');
+    if (!localStorage.getItem('cgest_tasks')) localStorage.setItem('cgest_tasks', '[]');
+    if (!localStorage.getItem('cgest_payments')) localStorage.setItem('cgest_payments', '[]');
   }
 
   // Helper to map Supabase user to App user
@@ -93,20 +80,21 @@ class DataService {
             return newPayment;
         }
     } else {
-         // Lógica real para Supabase (Simplificada para Insert direto por enquanto se não houver ID)
-         // Para upsert real, idealmente usaríamos .upsert() do Supabase, mas aqui vamos tentar inserir
          const userId = await this.getAuthUserId();
-         if (!userId) throw new Error("Usuário não autenticado");
+         if (!userId) throw new Error("Usuário não autenticado. Faça login novamente.");
 
-         // Tenta encontrar pagamento existente (lógica simplificada)
-         // Nota: Em produção, usaríamos uma query composta ou uma procedure RPC
+         // Prepara o payload com user_id
          const payload = { ...payment, user_id: userId };
          
          if (payment.id) {
+             // Update existing
              const { error } = await supabase!.from('payments').update(payload).eq('id', payment.id);
              if (error) throw error;
              return payload as Payment;
          } else {
+             // Insert new
+             // Nota: Em um cenário real de "Upsert" baseado em Mês/Cliente, faríamos uma verificação antes
+             // ou usaríamos uma constraint Unique no banco. Aqui, seguimos a lógica do app.
              const { data, error } = await supabase!.from('payments').insert([payload]).select().single();
              if (error) throw error;
              return data as Payment;
@@ -120,7 +108,7 @@ class DataService {
           return {
               clients: JSON.parse(localStorage.getItem('cgest_clients') || '[]'),
               projects: JSON.parse(localStorage.getItem('cgest_projects') || '[]'),
-              // ... outros dados
+              // ...
           };
       }
       return null;
@@ -129,16 +117,16 @@ class DataService {
   async restoreBackupData(data: any): Promise<void> {
       if (this.useMock && data) {
           if(Array.isArray(data.clients)) localStorage.setItem('cgest_clients', JSON.stringify(data.clients));
-          // ... outros dados
+          // ...
       }
   }
 
   // --- CRUD WRAPPERS ---
   
+  // CLIENTS
   async getClients(): Promise<Client[]> {
-    if (this.useMock) {
-      return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
-    }
+    if (this.useMock) return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
+    
     const { data, error } = await supabase!.from('clients').select('*');
     if (error) throw error;
     return data as Client[];
@@ -154,8 +142,9 @@ class DataService {
     }
     
     const userId = await this.getAuthUserId();
-    if (!userId) throw new Error("Usuário não autenticado. Faça login novamente.");
+    if (!userId) throw new Error("Usuário não autenticado.");
 
+    // INJEÇÃO DO USER_ID OBRIGATÓRIA PARA RLS
     const payload = { ...client, user_id: userId };
 
     const { data, error } = await supabase!.from('clients').insert([payload]).select().single();
@@ -187,8 +176,7 @@ class DataService {
     if(error) throw error;
   }
 
-  // Projects
-
+  // PROJECTS
   async getProjects(): Promise<Project[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_projects') || '[]');
     const { data } = await supabase!.from('projects').select('*');
@@ -224,7 +212,7 @@ class DataService {
   }
 
   async updateProjectPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> {
-    const paidAt = paymentStatus === 'paid' ? todayStr : undefined; // Use null if DB allows, but undefined here is fine for update object construction usually
+    const paidAt = paymentStatus === 'paid' ? todayStr : undefined;
     
     if(this.useMock) {
        const ps = await this.getProjects();
@@ -232,6 +220,7 @@ class DataService {
        localStorage.setItem('cgest_projects', JSON.stringify(updated));
        return;
     }
+    // paidAt sendo null remove a data no banco se voltar para pendente
     const { error } = await supabase!.from('projects').update({ paymentStatus, paidAt: paidAt || null }).eq('id', id);
     if (error) throw error;
   }
@@ -246,8 +235,7 @@ class DataService {
       if(error) throw error;
   }
 
-  // Goals
-
+  // GOALS
   async getGoals(): Promise<Goal[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_goals') || '[]');
       const { data } = await supabase!.from('goals').select('*');
@@ -263,6 +251,7 @@ class DataService {
       }
       const userId = await this.getAuthUserId();
       const payload = { ...goal, user_id: userId };
+      
       const { error } = await supabase!.from('goals').insert([payload]);
       if (error) throw error;
   }
@@ -287,8 +276,7 @@ class DataService {
       if (error) throw error;
   }
 
-  // Tasks
-
+  // TASKS
   async getTasks(): Promise<Task[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
       const { data } = await supabase!.from('tasks').select('*');
@@ -304,6 +292,7 @@ class DataService {
       }
       const userId = await this.getAuthUserId();
       const payload = { ...task, user_id: userId };
+
       const { error } = await supabase!.from('tasks').insert([payload]);
       if (error) throw error;
   }
@@ -329,8 +318,7 @@ class DataService {
       if (error) throw error;
   }
 
-  // Payments
-
+  // PAYMENTS
   async getPayments(): Promise<Payment[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_payments') || '[]');
       const { data } = await supabase!.from('payments').select('*');
@@ -352,8 +340,7 @@ class DataService {
       if (error) throw error;
   }
 
-  // --- AUTH REAL (PRODUÇÃO) ---
-
+  // --- AUTH ---
   async login(email: string, pass: string): Promise<User> {
       const { data, error } = await supabase!.auth.signInWithPassword({
           email,
@@ -400,7 +387,6 @@ class DataService {
       
       return this.mapSupabaseUser(data.user);
   }
-
 }
 
 export const dataService = new DataService();
