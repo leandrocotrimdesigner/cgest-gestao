@@ -32,13 +32,13 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // Timeout de segurança: Se o Supabase demorar mais de 3s, libera a UI
+    // Timeout de segurança aumentado para 10s para ambientes serverless mais lentos (Vercel)
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
-            console.warn("Supabase timeout: Forcing UI load.");
+            console.warn("Supabase timeout (10s): Forcing UI load state refresh.");
             setIsLoading(false);
         }
-    }, 3000);
+    }, 10000);
 
     const checkSession = async () => {
       try {
@@ -144,6 +144,7 @@ function App() {
           <div className="flex h-screen items-center justify-center bg-slate-50 flex-col gap-4">
              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
              <p className="text-slate-500 font-medium animate-pulse">Iniciando CGest...</p>
+             <p className="text-xs text-slate-400">Verificando sessão segura...</p>
           </div>
       );
   }

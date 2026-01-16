@@ -37,7 +37,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   
   // Forms State
-  const [clientFormData, setClientFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5, whatsapp: '' });
+  const [clientFormData, setClientFormData] = useState<Partial<Client>>({ type: 'avulso', status: 'active', monthlyValue: 0, dueDay: 5, whatsapp: '55' });
   const [paymentFormData, setPaymentFormData] = useState({ value: 0, description: '', month: '', receiptUrl: '' });
   const [isUploading, setIsUploading] = useState(false);
 
@@ -84,7 +84,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   
   const handleOpenAddClient = () => {
     setEditingClient(null);
-    setClientFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5, whatsapp: '' });
+    setClientFormData({ type: 'avulso', status: 'active', monthlyValue: 0, name: '', dueDay: 5, whatsapp: '55' });
     setIsClientModalOpen(true);
   };
 
@@ -97,9 +97,23 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         status: client.status,
         monthlyValue: client.monthlyValue || 0,
         dueDay: client.dueDay || 5,
-        whatsapp: client.whatsapp || ''
+        whatsapp: client.whatsapp || '55'
     });
     setIsClientModalOpen(true);
+  };
+
+  const handleWhatsAppChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Remove tudo que não for número
+      let val = e.target.value.replace(/\D/g, '');
+      
+      // Garante que comece com 55 se o usuário tentar apagar
+      if (val === '' || val === '5') {
+          val = '55';
+      } else if (!val.startsWith('55')) {
+          val = '55' + val;
+      }
+      
+      setClientFormData({...clientFormData, whatsapp: val});
   };
 
   const handleClientSubmit = async (e: React.FormEvent) => {
@@ -124,8 +138,8 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
             addToast({ type: 'success', title: 'Cliente adicionado' });
         }
         setIsClientModalOpen(false);
-    } catch (e) {
-        addToast({ type: 'error', title: 'Erro ao salvar cliente' });
+    } catch (e: any) {
+        addToast({ type: 'error', title: 'Erro ao salvar cliente', message: e.message || 'Verifique sua conexão.' });
     }
   };
 
@@ -141,7 +155,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         
         try {
             await onDeleteClient(clientToDelete.id);
-            addToast({ type: 'success', title: 'Cliente e dados removidos com sucesso' });
+            addToast({ type: 'success', title: 'Cliente removido' });
         } catch (error) {
             // Rollback optimistic update on error
             setDeletedIds(prev => {
@@ -386,17 +400,18 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         <form onSubmit={handleClientSubmit} className="space-y-4">
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome</label><input required type="text" value={clientFormData.name || ''} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} className={inputClass} /></div>
             
-            {/* NOVO CAMPO WHATSAPP */}
+            {/* WHATSAPP COM MÁSCARA E PRÉ-PREENCHIMENTO */}
             <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp</label>
                 <input 
-                    type="text" 
+                    type="tel" 
                     placeholder="5511999999999"
-                    value={clientFormData.whatsapp || ''} 
-                    onChange={e => setClientFormData({...clientFormData, whatsapp: e.target.value})} 
-                    className={inputClass} 
+                    value={clientFormData.whatsapp} 
+                    onChange={handleWhatsAppChange}
+                    className={inputClass}
+                    maxLength={15}
                 />
-                <p className="text-xs text-slate-400 mt-1">Formato: DDI + DDD + Número (apenas números)</p>
+                <p className="text-xs text-slate-400 mt-1">Apenas números. O código do país (55) é automático.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

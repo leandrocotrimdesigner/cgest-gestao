@@ -132,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
       const formattedValue = formatCurrency(payment.value);
       const description = payment.description || 'serviços prestados';
 
-      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: [SUA CHAVE PIX AQUI].`;
+      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: 62981607346 (Leandro Alves, Mercado Pago).`;
       
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
