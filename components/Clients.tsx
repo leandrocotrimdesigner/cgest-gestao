@@ -135,17 +135,20 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
   const confirmDeleteClient = async () => {
     if (clientToDelete) {
-        setDeletedIds(prev => new Set(prev).add(clientToDelete.id)); // Optimistic
+        // Optimistic UI update
+        setDeletedIds(prev => new Set(prev).add(clientToDelete.id)); 
+        
         try {
             await onDeleteClient(clientToDelete.id);
-            addToast({ type: 'success', title: 'Cliente removido' });
+            addToast({ type: 'success', title: 'Cliente e dados removidos com sucesso' });
         } catch (error) {
+            // Rollback optimistic update on error
             setDeletedIds(prev => {
                 const next = new Set(prev);
                 next.delete(clientToDelete.id);
                 return next;
             });
-            addToast({ type: 'error', title: 'Erro ao excluir' });
+            addToast({ type: 'error', title: 'Erro ao excluir cliente' });
         } finally {
             setClientToDelete(null);
         }
@@ -372,7 +375,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
       {/* --- MODALS SECTION USING BaseModal --- */}
 
-      {/* 1. Delete Client Confirmation */}
+      {/* 1. Delete Client Confirmation (Dark/Meta Style) */}
       <BaseModal
         isOpen={!!clientToDelete}
         onClose={() => setClientToDelete(null)}
@@ -382,8 +385,11 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       >
         <div className="space-y-4">
             <p className="text-slate-600">
-                Você está prestes a excluir <b>{clientToDelete?.name}</b>. Esta ação é irreversível e afetará o histórico financeiro.
+                Tem certeza que deseja excluir <b>{clientToDelete?.name}</b>?
             </p>
+            <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm text-red-700">
+                Esta ação não pode ser desfeita e removerá todos os dados vinculados (histórico financeiro, projetos e tarefas).
+            </div>
             <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setClientToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
                 <button onClick={confirmDeleteClient} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Exclusão</button>

@@ -1,3 +1,4 @@
+
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from '../types';
 import { supabase } from './supabaseClient';
 
@@ -29,6 +30,7 @@ const MOCK_GOALS: Goal[] = [
 
 const MOCK_TASKS: Task[] = [
   { id: 't1', title: 'Enviar nota fiscal Tech Solutions', isCompleted: false, projectId: '101', dueDate: todayStr, createdAt: new Date().toISOString() },
+  { id: 't2', title: 'Reunião de Alinhamento', isCompleted: false, projectId: '101', dueDate: todayStr, createdAt: new Date().toISOString(), isMeeting: true, meetingTime: '14:00' },
 ];
 
 const MOCK_PAYMENTS: Payment[] = [
@@ -64,7 +66,6 @@ class DataService {
   }
 
   // --- GENERIC UPSERT LOGIC FOR PAYMENTS ---
-  // Verifica se existe pagamento para Cliente + Mês + Ano. Se sim, atualiza. Se não, cria.
   async upsertPayment(payment: Partial<Payment> & { clientId: string, dueDate: string }): Promise<Payment> {
     const date = new Date(payment.dueDate);
     const targetMonth = date.getMonth();
@@ -74,12 +75,8 @@ class DataService {
         await delay(100);
         const payments: Payment[] = JSON.parse(localStorage.getItem('cgest_payments') || '[]');
         
-        // Find existing payment for same Month/Year/Client (Atomic Logic)
         const existingIndex = payments.findIndex(p => {
-             // If ID is provided, strict match
              if (payment.id && p.id === payment.id) return true;
-             
-             // Otherwise, duplicate check by date/client
              const pDate = new Date(p.dueDate);
              return p.clientId === payment.clientId && 
                     pDate.getMonth() === targetMonth && 
@@ -87,14 +84,12 @@ class DataService {
         });
 
         if (existingIndex >= 0) {
-            // UPDATE
             const existing = payments[existingIndex];
-            const updated = { ...existing, ...payment, id: existing.id }; // Ensure ID preservation
+            const updated = { ...existing, ...payment, id: existing.id }; 
             payments[existingIndex] = updated;
             localStorage.setItem('cgest_payments', JSON.stringify(payments));
             return updated;
         } else {
-            // INSERT
             const newPayment = { 
                 id: generateId(), 
                 value: 0, 
@@ -107,8 +102,6 @@ class DataService {
             return newPayment;
         }
     } else {
-        // Supabase Implementation (SimplifiedUpsert logic)
-        // Note: Real supabase implementation would need a RPC or improved schema constraints
         throw new Error("Supabase upsert not fully implemented in this demo.");
     }
   }
@@ -185,10 +178,30 @@ class DataService {
 
   async deleteClient(id: string): Promise<void> {
     if(this.useMock) {
+      // 1. Delete Client
       const clients = await this.getClients();
       localStorage.setItem('cgest_clients', JSON.stringify(clients.filter(c => c.id !== id)));
+
+      // 2. Cascade Delete: Payments linked to Client
+      const payments = await this.getPayments();
+      localStorage.setItem('cgest_payments', JSON.stringify(payments.filter(p => p.clientId !== id)));
+
+      // 3. Cascade Delete: Projects linked to Client (and Tasks linked to Projects)
+      const projects = await this.getProjects();
+      const clientProjects = projects.filter(p => p.clientId === id);
+      const clientProjectIds = new Set(clientProjects.map(p => p.id));
+      
+      // Remove Projects
+      localStorage.setItem('cgest_projects', JSON.stringify(projects.filter(p => p.clientId !== id)));
+
+      // Remove Tasks linked to those Projects
+      const tasks = await this.getTasks();
+      localStorage.setItem('cgest_tasks', JSON.stringify(tasks.filter(t => !t.projectId || !clientProjectIds.has(t.projectId))));
+      
       return;
     }
+    
+    // Supabase logic (requires Foreign Keys with ON DELETE CASCADE in DB schema for full safety)
     const { error } = await supabase!.from('clients').delete().eq('id', id);
     if(error) throw error;
   }
@@ -302,7 +315,6 @@ class DataService {
   }
 
   async addPayment(payment: Omit<Payment, 'id'>): Promise<void> {
-      // Reusing logic from upsert for consistency in mock
       await this.upsertPayment(payment as any);
   }
 
@@ -318,7 +330,6 @@ class DataService {
 
   async login(email: string, pass: string): Promise<User> {
       await delay(500);
-      // For demo, accept any login
       const storedName = localStorage.getItem('cgest_user_name');
       const storedAvatar = localStorage.getItem('cgest_user_avatar');
       
