@@ -1,8 +1,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// CREDENCIAIS DE PRODUÇÃO (A7)
-const SUPABASE_URL = 'https://kpfeocsqkwwpntnudssn.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_9irRgrueeD2l7NIhKco4gg_yVaNc-sR';
+const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error("Variáveis de ambiente do Supabase não encontradas.");
+}
+
+export const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '');
