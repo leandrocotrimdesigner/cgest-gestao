@@ -12,7 +12,14 @@ interface ProjectsProps {
   onDeleteProject: (id: string) => Promise<void>;
 }
 
-const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, onUpdateStatus, onUpdatePaymentStatus, onDeleteProject }) => {
+const Projects: React.FC<ProjectsProps> = ({ 
+    projects = [], 
+    clients = [], 
+    onAddProject, 
+    onUpdateStatus, 
+    onUpdatePaymentStatus, 
+    onDeleteProject 
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all');
   const [filterPayment, setFilterPayment] = useState<PaymentStatus | 'all'>('all');
@@ -23,15 +30,16 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
-  const displayedProjects = projects.filter(p => {
+  const displayedProjects = (projects || []).filter(p => {
     const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
     const matchesPayment = filterPayment === 'all' || (p.paymentStatus || 'pending') === filterPayment;
+    const clientName = (clients || []).find(c => c.id === p.clientId)?.name || '';
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          clients.find(c => c.id === p.clientId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
+                          clientName.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesPayment && matchesSearch && !deletedIds.has(p.id);
   });
 
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.name || 'Cliente Removido';
+  const getClientName = (id: string) => (clients || []).find(c => c.id === id)?.name || 'Cliente Removido';
 
   const handleDeleteRequest = (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
@@ -216,7 +224,7 @@ const Projects: React.FC<ProjectsProps> = ({ projects, clients, onAddProject, on
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
                 <select required value={formData.clientId || ''} onChange={e => setFormData({...formData, clientId: e.target.value})} className={inputClass}>
                   <option value="">Selecione...</option>
-                  {clients.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                  {(clients || []).map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">

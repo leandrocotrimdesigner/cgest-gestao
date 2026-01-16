@@ -26,7 +26,17 @@ const VERSES = [
     { text: "Porque sou eu que conheço os planos que tenho para vocês, diz o Senhor, planos de fazê-los prosperar.", reference: "Jeremias 29:11" },
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goals, tasks, onToggleTask, onAddGoal, onDeleteGoal, onUpdateGoal }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+    clients = [], 
+    projects = [], 
+    payments = [], 
+    goals = [], 
+    tasks = [], 
+    onToggleTask, 
+    onAddGoal, 
+    onDeleteGoal, 
+    onUpdateGoal 
+}) => {
   const [todaysVerse, setTodaysVerse] = useState(VERSES[0]);
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
   const [alertToDelete, setAlertToDelete] = useState<string | null>(null);
@@ -42,13 +52,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   }, []);
 
   const stats = useMemo(() => {
-    const activeClients = clients.filter(c => c.status === 'active');
+    const safeClients = clients || [];
+    const safeProjects = projects || [];
+
+    const activeClients = safeClients.filter(c => c.status === 'active');
     const totalClients = activeClients.length;
-    const activeProjects = projects.filter(p => p.status === 'in_progress').length;
+    const activeProjects = safeProjects.filter(p => p.status === 'in_progress').length;
     
     const mrr = activeClients.filter(c => c.type === 'mensalista').reduce((acc, curr) => acc + (curr.monthlyValue || 0), 0);
-    const pipeline = projects.filter(p => p.paymentStatus === 'pending').reduce((acc, curr) => acc + curr.budget, 0);
-    const projectRevenue = projects.filter(p => p.paymentStatus === 'paid').reduce((acc, curr) => acc + curr.budget, 0);
+    const pipeline = safeProjects.filter(p => p.paymentStatus === 'pending').reduce((acc, curr) => acc + curr.budget, 0);
+    const projectRevenue = safeProjects.filter(p => p.paymentStatus === 'paid').reduce((acc, curr) => acc + curr.budget, 0);
 
     return { totalClients, activeProjects, mrr, pipeline, projectRevenue };
   }, [clients, projects]);
@@ -56,13 +69,16 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
   const weeklyRevenueData = useMemo(() => {
      const data = [];
      const today = new Date();
+     const safePayments = payments || [];
+     const safeProjects = projects || [];
+
      for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
         const dayStr = d.toISOString().split('T')[0];
         
-        const dailyPayments = payments.filter(p => p.status === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.value, 0);
-        const dailyProjects = projects.filter(p => p.paymentStatus === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.budget, 0);
+        const dailyPayments = safePayments.filter(p => p.status === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.value, 0);
+        const dailyProjects = safeProjects.filter(p => p.paymentStatus === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.budget, 0);
 
         data.push({ 
             name: d.toLocaleDateString('pt-BR', { weekday: 'short' }), 
@@ -75,18 +91,18 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
   const overduePayments = useMemo(() => {
       const todayStr = new Date().toISOString().split('T')[0];
-      return payments
+      return (payments || [])
         .filter(p => p.status === 'pending' && p.dueDate < todayStr)
         .filter(p => !hiddenAlerts.has(p.id));
   }, [payments, hiddenAlerts]);
 
   const todaysTasks = useMemo(() => {
       const todayStr = new Date().toISOString().split('T')[0];
-      return tasks.filter(t => t.dueDate === todayStr);
+      return (tasks || []).filter(t => t.dueDate === todayStr);
   }, [tasks]);
 
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.name || 'Cliente';
-  const getProjectName = (id?: string) => projects.find(p => p.id === id)?.name;
+  const getClientName = (id: string) => (clients || []).find(c => c.id === id)?.name || 'Cliente';
+  const getProjectName = (id?: string) => (projects || []).find(p => p.id === id)?.name;
 
   const handleDeleteAlertRequest = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -101,10 +117,9 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
     }
   };
 
-  // --- WHATSAPP CHARGE LOGIC (Updated PIX) ---
   const handleWhatsAppCharge = (e: React.MouseEvent, payment: Payment) => {
       e.stopPropagation();
-      const client = clients.find(c => c.id === payment.clientId);
+      const client = (clients || []).find(c => c.id === payment.clientId);
       
       if (!client || !client.whatsapp) {
           alert("Este cliente não possui um número de WhatsApp cadastrado.");
@@ -146,13 +161,13 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
     if (!selectedDate) return [];
     const transactionList: Array<{ id: string; type: 'Receita' | 'Projeto'; clientName: string; description: string; value: number; date: string }> = [];
 
-    payments.forEach(p => {
+    (payments || []).forEach(p => {
         if (p.status === 'paid' && p.paidAt === selectedDate) {
             transactionList.push({ id: p.id, type: 'Receita', clientName: getClientName(p.clientId), description: p.description || 'Mensalidade/Avulso', value: p.value, date: p.paidAt });
         }
     });
 
-    projects.forEach(p => {
+    (projects || []).forEach(p => {
         if (p.paymentStatus === 'paid' && p.paidAt === selectedDate) {
             transactionList.push({ id: p.id, type: 'Projeto', clientName: getClientName(p.clientId), description: `Projeto: ${p.name}`, value: p.budget, date: p.paidAt });
         }
@@ -285,7 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, projects, payments, goal
 
       {/* 4. METAS */}
       <div className="pt-4 border-t border-slate-200">
-        <Goals goals={goals} onAddGoal={onAddGoal} onDeleteGoal={onDeleteGoal} onUpdateGoal={onUpdateGoal} readOnly={true} />
+        <Goals goals={goals || []} onAddGoal={onAddGoal} onDeleteGoal={onDeleteGoal} onUpdateGoal={onUpdateGoal} readOnly={true} />
       </div>
 
       {/* MODALS (Revenue Details & Alerts) */}

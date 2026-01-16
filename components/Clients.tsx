@@ -16,7 +16,15 @@ interface ClientsProps {
   onUpdatePayment?: (payment: Payment) => Promise<void>;
 }
 
-const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, onUpdateClient, onDeleteClient, onAddPayment, onUpdatePayment }) => {
+const Clients: React.FC<ClientsProps> = ({ 
+    clients = [], 
+    payments = [], 
+    onAddClient, 
+    onUpdateClient, 
+    onDeleteClient, 
+    onAddPayment, 
+    onUpdatePayment 
+}) => {
   const { addToast } = useToast();
   
   // Modals State
@@ -42,7 +50,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   const [isUploading, setIsUploading] = useState(false);
 
   // --- Helpers ---
-  const displayedClients = clients.filter(c => {
+  const displayedClients = (clients || []).filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus && !deletedIds.has(c.id);
@@ -53,12 +61,14 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
-      const hasOverdue = payments.some(p => p.clientId === client.id && p.status === 'pending' && p.dueDate < todayStr);
+      const safePayments = payments || [];
+
+      const hasOverdue = safePayments.some(p => p.clientId === client.id && p.status === 'pending' && p.dueDate < todayStr);
       
       let mensalistaOverdue = false;
       if (client.type === 'mensalista' && client.dueDay) {
           if (today.getDate() > client.dueDay) {
-               const hasPaymentForThisMonth = payments.some(p => {
+               const hasPaymentForThisMonth = safePayments.some(p => {
                    const pDate = new Date(p.dueDate);
                    return p.clientId === client.id && 
                           pDate.getMonth() === today.getMonth() && 
@@ -74,7 +84,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
 
   const getPaymentForMonth = (monthIndex: number) => {
       if (!selectedClient) return null;
-      return payments.find(p => {
+      return (payments || []).find(p => {
           const d = new Date(p.dueDate);
           return p.clientId === selectedClient.id && d.getMonth() === monthIndex && d.getFullYear() === selectedYear;
       });

@@ -129,7 +129,8 @@ class DataService {
     // Garante uso da tabela 'clients' (plural)
     const { data, error } = await supabase!.from('clients').select('*');
     if (error) throw error;
-    return data as Client[];
+    // PROTEÇÃO CONTRA NULL: Retorna [] se data for null
+    return (data || []) as Client[];
   }
 
   async addClient(client: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
@@ -180,7 +181,8 @@ class DataService {
   async getProjects(): Promise<Project[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_projects') || '[]');
     const { data } = await supabase!.from('projects').select('*');
-    return data as Project[];
+    // PROTEÇÃO CONTRA NULL
+    return (data || []) as Project[];
   }
 
   async addProject(project: any): Promise<Project> {
@@ -239,7 +241,8 @@ class DataService {
   async getGoals(): Promise<Goal[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_goals') || '[]');
       const { data } = await supabase!.from('goals').select('*');
-      return data as Goal[];
+      // PROTEÇÃO CONTRA NULL
+      return (data || []) as Goal[];
   }
 
   async addGoal(goal: any): Promise<void> {
@@ -280,7 +283,8 @@ class DataService {
   async getTasks(): Promise<Task[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
       const { data } = await supabase!.from('tasks').select('*');
-      return data as Task[];
+      // PROTEÇÃO CONTRA NULL
+      return (data || []) as Task[];
   }
 
   async addTask(task: Omit<Task, 'id' | 'createdAt'>): Promise<void> {
@@ -324,7 +328,8 @@ class DataService {
       
       // Garante uso da tabela 'payments' (plural)
       const { data, error } = await supabase!.from('payments').select('*');
-      return data as Payment[];
+      // PROTEÇÃO CONTRA NULL
+      return (data || []) as Payment[];
   }
 
   async addPayment(payment: Omit<Payment, 'id'>): Promise<void> {

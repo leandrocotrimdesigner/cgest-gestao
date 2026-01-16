@@ -21,7 +21,7 @@ function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Data State
+  // Data State Initialized as Empty Arrays
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -99,9 +99,13 @@ function App() {
         dataService.getPayments()
       ]);
 
-      // Helper para extrair dados ou retornar array vazio
-      const getData = <T,>(result: PromiseSettledResult<T[]>) => 
-        result.status === 'fulfilled' ? result.value : [];
+      // Helper para extrair dados ou retornar array vazio (Proteção contra null)
+      const getData = <T,>(result: PromiseSettledResult<T[]>) => {
+        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+            return result.value;
+        }
+        return [];
+      };
 
       setClients(getData(results[0]));
       setProjects(getData(results[1]));
@@ -111,6 +115,9 @@ function App() {
 
     } catch (error) {
       console.error("Critical error fetching data", error);
+    } finally {
+      // Garante que o loading seja removido mesmo com erro no fetch
+      setIsLoading(false);
     }
   };
 
@@ -126,7 +133,7 @@ function App() {
         const user = await dataService.login(email, pass);
         setUser(user);
     } catch (e) {
-        throw e; // Repassa erro para o componente de Login tratar
+        throw e; 
     } finally {
         setIsLoading(false);
     }
