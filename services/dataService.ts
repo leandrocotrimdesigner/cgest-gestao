@@ -11,21 +11,12 @@ const getPastDate = (days: number) => {
     return d.toISOString().split('T')[0];
 }
 
-// --- MOCK DATA ---
-// Dados iniciais vazios para garantir que o sistema comece limpo (sem dados fantasmas)
+// --- MOCK DATA (Fallback apenas para estruturas, não para Auth) ---
 const MOCK_CLIENTS: Client[] = [];
 const MOCK_PROJECTS: Project[] = [];
 const MOCK_GOALS: Goal[] = [];
 const MOCK_TASKS: Task[] = [];
 const MOCK_PAYMENTS: Payment[] = [];
-
-// Mantemos apenas o usuário para permitir o login no modo Demo
-const MOCK_USER: User = {
-    id: 'u1',
-    email: 'admin@cgest.com',
-    name: 'Admin User',
-    avatar: ''
-};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -33,6 +24,8 @@ class DataService {
   private useMock: boolean;
 
   constructor() {
+    // Em produção, queremos que o Supabase esteja sempre ativo.
+    // Se falhar a conexão, o useMock evita crash, mas o login será bloqueado.
     this.useMock = !supabase;
     if (this.useMock) {
       this.initLocalStore();
@@ -45,6 +38,16 @@ class DataService {
     if (!localStorage.getItem('cgest_goals')) localStorage.setItem('cgest_goals', JSON.stringify(MOCK_GOALS));
     if (!localStorage.getItem('cgest_tasks')) localStorage.setItem('cgest_tasks', JSON.stringify(MOCK_TASKS));
     if (!localStorage.getItem('cgest_payments')) localStorage.setItem('cgest_payments', JSON.stringify(MOCK_PAYMENTS));
+  }
+
+  // Helper to map Supabase user to App user
+  private mapSupabaseUser(u: any): User {
+      return {
+          id: u.id,
+          email: u.email || '',
+          name: u.user_metadata?.name || u.email?.split('@')[0] || 'Usuário',
+          avatar: u.user_metadata?.avatar_url || ''
+      };
   }
 
   // --- GENERIC UPSERT LOGIC FOR PAYMENTS ---
@@ -84,7 +87,8 @@ class DataService {
             return newPayment;
         }
     } else {
-        throw new Error("Supabase upsert not fully implemented in this demo.");
+        // Feature futura: Implementar RPC no Supabase para upsert real
+        throw new Error("Funcionalidade de Upsert via API pendente de implementação no Backend.");
     }
   }
 
@@ -126,7 +130,6 @@ class DataService {
   
   async getClients(): Promise<Client[]> {
     if (this.useMock) {
-      await delay(100);
       return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
     }
     const { data, error } = await supabase!.from('clients').select('*');
@@ -160,30 +163,24 @@ class DataService {
 
   async deleteClient(id: string): Promise<void> {
     if(this.useMock) {
-      // 1. Delete Client
       const clients = await this.getClients();
       localStorage.setItem('cgest_clients', JSON.stringify(clients.filter(c => c.id !== id)));
 
-      // 2. Cascade Delete: Payments linked to Client
+      // Cascade Delete
       const payments = await this.getPayments();
       localStorage.setItem('cgest_payments', JSON.stringify(payments.filter(p => p.clientId !== id)));
 
-      // 3. Cascade Delete: Projects linked to Client (and Tasks linked to Projects)
       const projects = await this.getProjects();
       const clientProjects = projects.filter(p => p.clientId === id);
       const clientProjectIds = new Set(clientProjects.map(p => p.id));
       
-      // Remove Projects
       localStorage.setItem('cgest_projects', JSON.stringify(projects.filter(p => p.clientId !== id)));
-
-      // Remove Tasks linked to those Projects
+      
       const tasks = await this.getTasks();
       localStorage.setItem('cgest_tasks', JSON.stringify(tasks.filter(t => !t.projectId || !clientProjectIds.has(t.projectId))));
       
       return;
     }
-    
-    // Supabase logic (requires Foreign Keys with ON DELETE CASCADE in DB schema for full safety)
     const { error } = await supabase!.from('clients').delete().eq('id', id);
     if(error) throw error;
   }
@@ -308,22 +305,41 @@ class DataService {
       }
   }
 
-  // Auth & User
+  // --- AUTH REAL (PRODUÇÃO) ---
 
   async login(email: string, pass: string): Promise<User> {
-      await delay(500);
-      const storedName = localStorage.getItem('cgest_user_name');
-      const storedAvatar = localStorage.getItem('cgest_user_avatar');
+      // Bloqueia login se o Supabase não estiver configurado corretamente
+      if (this.useMock) {
+          throw new Error("Erro de Configuração: Backend de autenticação indisponível.");
+      }
+
+      const { data, error } = await supabase!.auth.signInWithPassword({
+          email,
+          password: pass
+      });
+
+      if (error) {
+          throw new Error(error.message);
+      }
       
-      const user = { ...MOCK_USER, email };
-      if (storedName) user.name = storedName;
-      if (storedAvatar) user.avatar = storedAvatar;
+      if (!data.user) throw new Error("Usuário não encontrado.");
       
-      return user;
+      return this.mapSupabaseUser(data.user);
   }
 
   async logout(): Promise<void> {
-      await delay(200);
+      if (this.useMock) return;
+      await supabase!.auth.signOut();
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+      if (this.useMock) return null;
+      
+      const { data: { session } } = await supabase!.auth.getSession();
+      if (session?.user) {
+          return this.mapSupabaseUser(session.user);
+      }
+      return null;
   }
 
   async updateUser(user: User): Promise<User> {
@@ -332,7 +348,15 @@ class DataService {
          if (user.avatar) localStorage.setItem('cgest_user_avatar', user.avatar);
          return user;
       }
-      return user;
+      
+      const updates: any = {
+          data: { name: user.name, avatar_url: user.avatar }
+      };
+      
+      const { data, error } = await supabase!.auth.updateUser(updates);
+      if (error) throw error;
+      
+      return this.mapSupabaseUser(data.user);
   }
 
 }

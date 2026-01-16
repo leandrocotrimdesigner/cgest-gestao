@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Client, Payment } from '../types';
-import { Plus, Trash2, Search, DollarSign, X, CheckCircle, AlertCircle, Edit2, UploadCloud, FileText, Loader2, Filter } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, CheckCircle, AlertCircle, Edit2, UploadCloud, Loader2 } from 'lucide-react';
 import { googleDriveService } from '../services/googleDriveService';
 import { useToast } from './ToastContext';
 import { BaseModal } from './BaseModal';
@@ -29,7 +29,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
   
   // Deletion States
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  const [attachmentToDelete, setAttachmentToDelete] = useState<Payment | null>(null);
 
   // Filters & UI
   const [searchTerm, setSearchTerm] = useState('');
@@ -257,27 +256,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
       }
   };
 
-  const handleRemoveAttachmentRequest = (e: React.MouseEvent, payment: Payment) => {
-    e.stopPropagation();
-    setAttachmentToDelete(payment);
-  };
-
-  const confirmRemoveAttachment = async () => {
-      if (attachmentToDelete && onUpdatePayment) {
-          try {
-              await onUpdatePayment({
-                  ...attachmentToDelete,
-                  receiptUrl: '' // Clears the link
-              });
-              addToast({ type: 'success', title: 'Anexo removido' });
-          } catch (error) {
-              addToast({ type: 'error', title: 'Erro ao remover anexo' });
-          } finally {
-              setAttachmentToDelete(null);
-          }
-      }
-  };
-
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const fullMonths = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -397,27 +375,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         </div>
       </BaseModal>
 
-      {/* 2. Remove Attachment Confirmation */}
-      <BaseModal
-        isOpen={!!attachmentToDelete}
-        onClose={() => setAttachmentToDelete(null)}
-        title="Remover Anexo"
-        variant="danger"
-        icon={<FileText size={24} />}
-      >
-        <div className="space-y-4">
-            <p className="text-slate-600">
-                Deseja desvincular o comprovante deste pagamento? <br/>
-                <span className="text-xs text-slate-500">O valor e a data do pagamento serão mantidos.</span>
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setAttachmentToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button onClick={confirmRemoveAttachment} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md">Confirmar Remoção</button>
-            </div>
-        </div>
-      </BaseModal>
-
-      {/* 3. Add/Edit Client Form */}
+      {/* 2. Add/Edit Client Form */}
       <BaseModal
         isOpen={isClientModalOpen}
         onClose={() => setIsClientModalOpen(false)}
@@ -453,7 +411,7 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
         </form>
       </BaseModal>
 
-      {/* 4. Financial Modal */}
+      {/* 3. Financial Modal */}
       <BaseModal
         isOpen={isFinancialModalOpen}
         onClose={() => setIsFinancialModalOpen(false)}
@@ -579,30 +537,6 @@ const Clients: React.FC<ClientsProps> = ({ clients, payments = [], onAddClient, 
                                         <span className="text-sm font-mono font-bold tracking-tight">{formatCurrency(payment.value)}</span>
                                     ) : (
                                         <span className="text-xs opacity-40">-</span>
-                                    )}
-                                </div>
-
-                                <div className="w-full h-7 flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                    {payment?.receiptUrl && (
-                                        <>
-                                            <a 
-                                                href={payment.receiptUrl} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium bg-white/60 hover:bg-blue-50 text-slate-600 hover:text-blue-600 border border-transparent hover:border-blue-200 transition-all shadow-sm"
-                                                title="Abrir Comprovante"
-                                            >
-                                                <FileText size={12} />
-                                                <span>Ver Doc</span>
-                                            </a>
-                                            <button 
-                                                onClick={(e) => handleRemoveAttachmentRequest(e, payment)}
-                                                className="w-6 h-6 flex items-center justify-center rounded-full bg-white/60 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors shadow-sm"
-                                                title="Excluir Comprovante"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </>
                                     )}
                                 </div>
                             </div>

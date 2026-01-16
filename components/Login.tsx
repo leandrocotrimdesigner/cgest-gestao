@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (email: string, pass: string) => Promise<void>;
@@ -18,8 +18,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
     try {
       await onLogin(email, password);
-    } catch (err) {
-      setError('Falha no login. Verifique suas credenciais.');
+    } catch (err: any) {
+      // Mensagens de erro amigáveis
+      let msg = 'Falha no login. Verifique suas credenciais.';
+      if (err.message && err.message.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
+      if (err.message && err.message.includes('Email not confirmed')) msg = 'Verifique seu e-mail para confirmar a conta.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -38,11 +42,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 alt="CGest" 
                 className="h-24 w-auto object-contain mb-4"
             />
-            <p className="text-slate-500 text-sm">Entre para gerenciar seu negócio</p>
+            <p className="text-slate-500 text-sm">Acesso Administrativo</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center gap-2">
+              <ShieldCheck size={16} />
               {error}
             </div>
           )}
@@ -87,14 +92,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             >
               {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Entrar'}
             </button>
-
-            <div className="text-center mt-4 text-xs text-slate-400">
-              <p>Demo: Use qualquer e-mail/senha para testar.</p>
-            </div>
           </form>
         </div>
         <div className="bg-slate-50 p-4 border-t border-slate-100 text-center text-xs text-slate-400">
-          &copy; 2026 CGest System.
+          &copy; 2026 CGest System. Todos os direitos reservados.
         </div>
       </div>
     </div>

@@ -21,7 +21,6 @@ const CLIENT_ID = getEnvVar('VITE_GOOGLE_CLIENT_ID');
 // ID Fixo da pasta de destino
 const TARGET_FOLDER_ID = '1cWSxDO4_U2-nUP-oP5RncVoBMRqJ-l1N';
 
-// Deixamos vazio para evitar o erro 502 na carga dos docs, pois usamos fetch direto.
 const DISCOVERY_DOCS: string[] = []; 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -50,7 +49,6 @@ class GoogleDriveService {
                   return;
               }
 
-              // Inicialização básica do GAPI Client
               await window.gapi.client.init({
                 apiKey: API_KEY,
                 discoveryDocs: DISCOVERY_DOCS,
@@ -58,18 +56,16 @@ class GoogleDriveService {
               
               this.isGapiInitialized = true;
 
-              // Inicializa o cliente GIS (Google Identity Services)
               if (window.google && !this.tokenClient) {
                 this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                   client_id: CLIENT_ID,
                   scope: SCOPES,
-                  callback: '', // Callback dinâmico será injetado no momento da auth
+                  callback: '', 
                 });
               }
               resolve();
             } catch (error: any) {
               console.error('Falha na inicialização do GAPI:', error);
-              // Resolvemos para não travar a aplicação, mas logamos o erro
               resolve();
             }
           });
@@ -110,18 +106,15 @@ class GoogleDriveService {
         }
       };
       
-      // Solicita consentimento se não houver token válido
       const existingToken = window.gapi?.client?.getToken();
       this.tokenClient.requestAccessToken({ prompt: existingToken ? '' : 'consent' });
   }
 
   uploadFile = async (file: File): Promise<string> => {
-    // 1. Inicialização
     if (!this.isGapiInitialized || !window.gapi || !window.gapi.client) {
        await this.initClient();
     }
     
-    // 2. Verificação de Token
     const token = window.gapi.client.getToken();
     if (!token) {
         await this.handleAuthClick();
@@ -139,7 +132,6 @@ class GoogleDriveService {
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', file);
 
-        // Upload Multipart direto via Fetch (mais robusto que a lib client para arquivos)
         const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
             method: 'POST',
             headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
@@ -162,7 +154,6 @@ class GoogleDriveService {
         
         const errorCode = error.status || error.code;
         
-        // Trata erro de permissão pedindo novo token
         if (errorCode === 401 || errorCode === 403 || (error.error?.message && error.error.message.includes('Permission'))) {
              if (this.tokenClient) {
                  this.tokenClient.requestAccessToken({ prompt: 'consent' });

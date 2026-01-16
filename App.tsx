@@ -13,6 +13,7 @@ import Agenda from './components/Agenda';
 import { dataService } from './services/dataService';
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from './types';
 import { ToastProvider } from './components/ToastContext';
+import { supabase } from './services/supabaseClient';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -27,12 +28,42 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
 
-  // Check auth check on mount
+  // Auth & Session Persistence Logic
   useEffect(() => {
-    // In a real app with supabase, we would check the session here.
-    setIsLoading(false);
+    // 1. Check initial session
+    const checkSession = async () => {
+      try {
+        const currentUser = await dataService.getCurrentUser();
+        if (currentUser) {
+            setUser(currentUser);
+        }
+      } catch (error) {
+        console.error("Session check failed", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkSession();
+
+    // 2. Listen for auth changes
+    if (supabase) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                // Recupera o usuário formatado pelo dataService
+                const currentUser = await dataService.getCurrentUser();
+                setUser(currentUser);
+            } else if (event === 'SIGNED_OUT') {
+                setUser(null);
+                setClients([]); setProjects([]); setGoals([]); setTasks([]); setPayments([]);
+            }
+        });
+        return () => subscription.unsubscribe();
+    } else {
+        setIsLoading(false);
+    }
   }, []);
 
+  // Fetch data only when user is authenticated
   const fetchData = async () => {
     try {
       const [fetchedClients, fetchedProjects, fetchedGoals, fetchedTasks, fetchedPayments] = await Promise.all([
@@ -74,89 +105,32 @@ function App() {
   };
 
   // --- Handlers ---
+  const handleAddClient = async (clientData: any) => { await dataService.addClient(clientData); fetchData(); };
+  const handleUpdateClient = async (clientData: Client) => { await dataService.updateClient(clientData); fetchData(); };
+  const handleDeleteClient = async (id: string) => { await dataService.deleteClient(id); fetchData(); };
+  const handleAddProject = async (projectData: any) => { await dataService.addProject(projectData); fetchData(); };
+  const handleUpdateProjectStatus = async (id: string, status: any) => { await dataService.updateProjectStatus(id, status); fetchData(); };
+  const handleUpdateProjectPaymentStatus = async (id: string, status: PaymentStatus) => { await dataService.updateProjectPaymentStatus(id, status); fetchData(); };
+  const handleDeleteProject = async (id: string) => { await dataService.deleteProject(id); fetchData(); };
+  const handleAddGoal = async (goalData: any) => { await dataService.addGoal(goalData); fetchData(); };
+  const handleDeleteGoal = async (id: string) => { await dataService.deleteGoal(id); fetchData(); };
+  const handleUpdateGoal = async (goal: Goal) => { await dataService.updateGoal(goal); fetchData(); };
+  const handleAddTask = async (taskData: any) => { await dataService.addTask(taskData); fetchData(); };
+  const handleToggleTask = async (id: string, isCompleted: boolean) => { await dataService.toggleTask(id, isCompleted); fetchData(); };
+  const handleDeleteTask = async (id: string) => { await dataService.deleteTask(id); fetchData(); };
+  const handleAddPayment = async (paymentData: any) => { await dataService.addPayment(paymentData); fetchData(); };
+  const handleUpdatePayment = async (payment: Payment) => { await dataService.updatePayment(payment); fetchData(); };
 
-  const handleAddClient = async (clientData: any) => {
-    await dataService.addClient(clientData);
-    fetchData(); 
-  };
+  if (isLoading) {
+      return (
+          <div className="flex h-screen items-center justify-center bg-slate-50 flex-col gap-4">
+             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+             <p className="text-slate-500 font-medium animate-pulse">Iniciando CGest...</p>
+          </div>
+      );
+  }
 
-  const handleUpdateClient = async (clientData: Client) => {
-    await dataService.updateClient(clientData);
-    fetchData();
-  };
-
-  const handleDeleteClient = async (id: string) => {
-    // Confirmation is handled in the component
-    await dataService.deleteClient(id);
-    fetchData();
-  };
-
-  const handleAddProject = async (projectData: any) => {
-    await dataService.addProject(projectData);
-    fetchData();
-  };
-
-  const handleUpdateProjectStatus = async (id: string, status: any) => {
-    await dataService.updateProjectStatus(id, status);
-    fetchData();
-  };
-
-  const handleUpdateProjectPaymentStatus = async (id: string, status: PaymentStatus) => {
-    await dataService.updateProjectPaymentStatus(id, status);
-    fetchData();
-  };
-
-  const handleDeleteProject = async (id: string) => {
-    // Confirmation is handled in the component
-    await dataService.deleteProject(id);
-    fetchData();
-  };
-
-  const handleAddGoal = async (goalData: any) => {
-    await dataService.addGoal(goalData);
-    fetchData();
-  };
-
-  const handleDeleteGoal = async (id: string) => {
-    // Logic for goals is handled inside Goals.tsx (safe delete by name)
-    await dataService.deleteGoal(id);
-    fetchData();
-  };
-
-  const handleUpdateGoal = async (goal: Goal) => {
-    await dataService.updateGoal(goal);
-    fetchData();
-  };
-
-  const handleAddTask = async (taskData: any) => {
-    await dataService.addTask(taskData);
-    fetchData();
-  };
-
-  const handleToggleTask = async (id: string, isCompleted: boolean) => {
-    await dataService.toggleTask(id, isCompleted);
-    fetchData();
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    // Deletion confirmation is handled by Tasks.tsx
-    await dataService.deleteTask(id);
-    fetchData();
-  };
-
-  // Payment Handlers
-  const handleAddPayment = async (paymentData: any) => {
-      await dataService.addPayment(paymentData);
-      fetchData();
-  };
-
-  const handleUpdatePayment = async (payment: Payment) => {
-      await dataService.updatePayment(payment);
-      fetchData();
-  };
-
-  if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-50">Carregando...</div>;
-
+  // Route Protection: If no user, show Login
   if (!user) {
     return (
       <ToastProvider>
