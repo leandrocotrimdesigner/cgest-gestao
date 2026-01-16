@@ -93,8 +93,7 @@ class DataService {
              return payload as Payment;
          } else {
              // Insert new
-             // Nota: Em um cenário real de "Upsert" baseado em Mês/Cliente, faríamos uma verificação antes
-             // ou usaríamos uma constraint Unique no banco. Aqui, seguimos a lógica do app.
+             // Garante uso da tabela 'payments' (plural)
              const { data, error } = await supabase!.from('payments').insert([payload]).select().single();
              if (error) throw error;
              return data as Payment;
@@ -127,6 +126,7 @@ class DataService {
   async getClients(): Promise<Client[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
     
+    // Garante uso da tabela 'clients' (plural)
     const { data, error } = await supabase!.from('clients').select('*');
     if (error) throw error;
     return data as Client[];
@@ -321,7 +321,9 @@ class DataService {
   // PAYMENTS
   async getPayments(): Promise<Payment[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_payments') || '[]');
-      const { data } = await supabase!.from('payments').select('*');
+      
+      // Garante uso da tabela 'payments' (plural)
+      const { data, error } = await supabase!.from('payments').select('*');
       return data as Payment[];
   }
 

@@ -32,13 +32,13 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // Timeout de segurança aumentado para 10s para ambientes serverless mais lentos (Vercel)
+    // Timeout de Emergência (8s): Se travar, libera a UI
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
-            console.warn("Supabase timeout (10s): Forcing UI load state refresh.");
+            console.warn("Supabase timeout (8s): Forcing UI unlock.");
             setIsLoading(false);
         }
-    }, 10000);
+    }, 8000);
 
     const checkSession = async () => {
       try {
@@ -49,6 +49,8 @@ function App() {
       } catch (error) {
         console.error("Session check failed", error);
       } finally {
+        // Se já temos usuário ou falhou, paramos o loading inicial da sessão
+        // O loading de dados (fetchData) acontece em background ou mostra estado vazio
         if (mounted) setIsLoading(false);
         clearTimeout(safetyTimeout);
       }
@@ -64,9 +66,11 @@ function App() {
             if (event === 'SIGNED_IN' && session?.user) {
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
+                setIsLoading(false); // Garante desbloqueio ao logar
             } else if (event === 'SIGNED_OUT') {
                 setUser(null);
                 setClients([]); setProjects([]); setGoals([]); setTasks([]); setPayments([]);
+                setIsLoading(false);
             }
         });
         subscription = authData.data.subscription;
@@ -83,21 +87,30 @@ function App() {
 
   // Fetch data only when user is authenticated
   const fetchData = async () => {
+    if (!user) return;
+    
     try {
-      const [fetchedClients, fetchedProjects, fetchedGoals, fetchedTasks, fetchedPayments] = await Promise.all([
+      // Carregamento paralelo resiliente: Se um falhar, os outros continuam
+      const results = await Promise.allSettled([
         dataService.getClients(),
         dataService.getProjects(),
         dataService.getGoals(),
         dataService.getTasks(),
         dataService.getPayments()
       ]);
-      setClients(fetchedClients);
-      setProjects(fetchedProjects);
-      setGoals(fetchedGoals);
-      setTasks(fetchedTasks);
-      setPayments(fetchedPayments);
+
+      // Helper para extrair dados ou retornar array vazio
+      const getData = <T,>(result: PromiseSettledResult<T[]>) => 
+        result.status === 'fulfilled' ? result.value : [];
+
+      setClients(getData(results[0]));
+      setProjects(getData(results[1]));
+      setGoals(getData(results[2]));
+      setTasks(getData(results[3]));
+      setPayments(getData(results[4]));
+
     } catch (error) {
-      console.error("Failed to fetch data", error);
+      console.error("Critical error fetching data", error);
     }
   };
 
@@ -108,8 +121,15 @@ function App() {
   }, [user]);
 
   const handleLogin = async (email: string, pass: string) => {
-    const user = await dataService.login(email, pass);
-    setUser(user);
+    setIsLoading(true);
+    try {
+        const user = await dataService.login(email, pass);
+        setUser(user);
+    } catch (e) {
+        throw e; // Repassa erro para o componente de Login tratar
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -144,7 +164,6 @@ function App() {
           <div className="flex h-screen items-center justify-center bg-slate-50 flex-col gap-4">
              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
              <p className="text-slate-500 font-medium animate-pulse">Iniciando CGest...</p>
-             <p className="text-xs text-slate-400">Verificando sessão segura...</p>
           </div>
       );
   }
