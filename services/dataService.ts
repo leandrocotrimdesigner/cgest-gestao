@@ -28,13 +28,12 @@ class DataService {
 
   // --- HELPERS DE MAPEAMENTO ---
   
-  // Converte dados do Banco (snake_case) para o Frontend (camelCase)
   private mapDbToClient(record: any): Client {
       return {
           id: record.id,
           name: record.name,
           whatsapp: record.whatsapp,
-          type: record.contract_type || 'avulso', // Mapeia coluna contract_type
+          type: record.contract_type || 'avulso', 
           status: record.status || 'active',
           monthlyValue: record.monthly_value ? Number(record.monthly_value) : undefined,
           dueDay: record.due_day ? Number(record.due_day) : undefined,
@@ -62,10 +61,8 @@ class DataService {
 
   // --- GENERIC UPSERT LOGIC FOR PAYMENTS ---
   async upsertPayment(payment: Partial<Payment> & { clientId: string, dueDate: string }): Promise<Payment> {
-    // ... lógica existente mantida ou adaptada ...
     if (this.useMock) {
         await delay(100);
-        // Mock logic (simplificado para focar na correção do DB real)
         return { ...payment, id: generateId() } as Payment;
     } else {
          const userId = await this.getAuthUserId();
@@ -108,10 +105,9 @@ class DataService {
     try {
         const { data, error } = await supabase!.from('clients').select('*');
         if (error) {
-            console.warn("Erro ao buscar clientes:", error.message);
+            console.warn("Erro ao buscar clientes (possível erro de rede ou tabela vazia):", error.message);
             return [];
         }
-        // Aplica o mapeamento para garantir que a UI receba os campos corretos
         return (data || []).map(this.mapDbToClient);
     } catch (e) {
         return [];
@@ -133,33 +129,46 @@ class DataService {
         throw new Error("Sessão expirada. Faça login novamente.");
     }
 
-    // LIMPEZA E TRATAMENTO DO WHATSAPP
+    // Tratamento WhatsApp
     let cleanWhatsapp = client.whatsapp ? client.whatsapp.toString().replace(/\D/g, '') : '';
     if (cleanWhatsapp.length > 0 && !cleanWhatsapp.startsWith('55')) {
         cleanWhatsapp = '55' + cleanWhatsapp;
     }
 
-    // PAYLOAD MAPEADO (Snake Case para o Banco)
+    // Payload final
     const dbPayload = { 
         name: client.name,
         whatsapp: cleanWhatsapp,
-        contract_type: client.type, // UI: type -> DB: contract_type
+        contract_type: client.type,
         status: client.status,
-        monthly_value: client.monthlyValue, // UI: monthlyValue -> DB: monthly_value
-        due_day: client.dueDay, // UI: dueDay -> DB: due_day
+        monthly_value: client.monthlyValue,
+        due_day: client.dueDay,
         user_id: userId 
     };
 
-    console.log('[DataService] Salvando na tabela "clients". Payload:', dbPayload);
+    console.log('[DataService] Tentando salvar. User ID:', userId);
+    console.log('[DataService] Payload:', dbPayload);
 
-    const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-    if (error) {
-        console.error("Erro Supabase (addClient):", error);
-        throw new Error(`Erro ao salvar: ${error.message} (Code: ${error.code})`);
+    try {
+        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
+        
+        if (error) {
+            console.error("Erro Supabase:", error);
+            throw new Error(`Erro ao salvar: ${error.message} (Code: ${error.code})`);
+        }
+        
+        return this.mapDbToClient(data);
+
+    } catch (err: any) {
+        console.error("Erro Capturado no addClient:", err);
+        
+        // Tratamento específico para erro de rede/CORS
+        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('Load failed'))) {
+            throw new Error("Tente realizar esta operação diretamente pelo link da Vercel, pois o ambiente de desenvolvimento pode estar bloqueando a conexão.");
+        }
+        
+        throw err;
     }
-    
-    // Retorna o dado mapeado de volta para a UI
-    return this.mapDbToClient(data);
   }
 
   async updateClient(client: Client): Promise<void> {
@@ -201,7 +210,7 @@ class DataService {
     if (error) throw new Error(`Erro ao excluir: ${error.message}`);
   }
 
-  // PROJECTS (Silenciado com try/catch e retorno vazio)
+  // PROJECTS
   async getProjects(): Promise<Project[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_projects') || '[]');
     try {
@@ -212,7 +221,6 @@ class DataService {
   }
 
   async addProject(project: any): Promise<Project> {
-      // Retorna fake se banco falhar por falta de tabela, para nao travar UI
       try {
         if (this.useMock) return { ...project, id: generateId() };
         const userId = await this.getAuthUserId();
@@ -222,7 +230,7 @@ class DataService {
         if(error) throw error;
         return data as Project;
       } catch (e) {
-          console.warn("Project add failed (table missing?)", e);
+          console.warn("Project add failed", e);
           return { ...project, id: generateId() } as Project;
       }
   }
@@ -231,7 +239,7 @@ class DataService {
   async updateProjectPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> { /* ... */ }
   async deleteProject(id: string): Promise<void> { /* ... */ }
 
-  // GOALS (Silenciado)
+  // GOALS
   async getGoals(): Promise<Goal[]> {
       try {
         if (this.useMock) return [];
@@ -244,7 +252,7 @@ class DataService {
   async updateGoal(goal: Goal): Promise<void> {}
   async deleteGoal(id: string): Promise<void> {}
 
-  // TASKS (Silenciado)
+  // TASKS
   async getTasks(): Promise<Task[]> {
       try {
         if (this.useMock) return [];
@@ -257,7 +265,7 @@ class DataService {
   async toggleTask(id: string, isCompleted: boolean): Promise<void> {}
   async deleteTask(id: string): Promise<void> {}
 
-  // PAYMENTS (Silenciado)
+  // PAYMENTS
   async getPayments(): Promise<Payment[]> {
       try {
         if (this.useMock) return [];
