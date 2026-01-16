@@ -24,9 +24,10 @@ class DataService {
   private useMock: boolean;
 
   constructor() {
-    // Em produção, queremos que o Supabase esteja sempre ativo.
-    // Se falhar a conexão, o useMock evita crash, mas o login será bloqueado.
+    // Com as chaves hardcoded, o supabase sempre existirá.
+    // Forçamos useMock como false se o cliente existir.
     this.useMock = !supabase;
+    
     if (this.useMock) {
       this.initLocalStore();
     }
@@ -308,11 +309,8 @@ class DataService {
   // --- AUTH REAL (PRODUÇÃO) ---
 
   async login(email: string, pass: string): Promise<User> {
-      // Bloqueia login se o Supabase não estiver configurado corretamente
-      if (this.useMock) {
-          throw new Error("Erro de Configuração: Backend de autenticação indisponível.");
-      }
-
+      // Tenta login direto via Supabase sem checar flag de mock
+      // Isso garante que a requisição de rede aconteça
       const { data, error } = await supabase!.auth.signInWithPassword({
           email,
           password: pass
