@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, RefreshCw, LogOut } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, RefreshCw, LogOut, AlertCircle } from 'lucide-react';
 import { googleCalendarService, GoogleEvent } from '../services/googleCalendarService';
 import { 
   format, 
@@ -24,6 +24,9 @@ const Agenda: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  
+  // State para verificar se está configurado
+  const [isConfigured, setIsConfigured] = useState(true);
 
   useEffect(() => {
     // Leitura segura via import.meta.env
@@ -31,11 +34,11 @@ const Agenda: React.FC = () => {
     const clientId = env.VITE_GOOGLE_CLIENT_ID;
     const apiKey = env.VITE_GOOGLE_API_KEY;
     
-    // Debug para verificar carregamento (Remover em produção se desejar)
-    console.log('Status Env Vars:', { 
-        hasClientId: !!clientId, 
-        hasApiKey: !!apiKey 
-    });
+    // GUARD CLAUSE: Se não houver chaves, não tenta iniciar e para o loading
+    if (!clientId || !apiKey || clientId.includes('seu_client_id')) {
+        setIsConfigured(false);
+        return;
+    }
 
     const init = async () => {
       try {
@@ -52,6 +55,7 @@ const Agenda: React.FC = () => {
   }, []);
 
   const fetchEvents = async (date: Date) => {
+    if (!isConfigured) return;
     setIsLoading(true);
     try {
         const start = startOfMonth(date);
@@ -115,6 +119,20 @@ const Agenda: React.FC = () => {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  if (!isConfigured) {
+      return (
+          <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+              <div className="bg-yellow-50 p-4 rounded-full">
+                  <AlertCircle className="text-yellow-600 w-12 h-12" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">Agenda Não Configurada</h2>
+              <p className="text-slate-500 max-w-md">
+                  As chaves de API do Google não foram encontradas. Adicione <code>VITE_GOOGLE_CLIENT_ID</code> e <code>VITE_GOOGLE_API_KEY</code> no seu arquivo .env para habilitar esta funcionalidade.
+              </p>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn h-[calc(100vh-140px)] flex flex-col">

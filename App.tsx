@@ -32,13 +32,13 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // Timeout de Emergência (8s): Se travar, libera a UI
+    // Timeout de Emergência (3s): Destrava a UI rapidamente se a conexão for lenta/bloqueada
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
-            console.warn("Supabase timeout (8s): Forcing UI unlock.");
+            console.warn("Inicialização lenta: Forçando desbloqueio da UI (3s).");
             setIsLoading(false);
         }
-    }, 8000);
+    }, 3000);
 
     const checkSession = async () => {
       try {
@@ -47,10 +47,9 @@ function App() {
             setUser(currentUser);
         }
       } catch (error) {
-        console.error("Session check failed", error);
+        console.error("Falha ao verificar sessão:", error);
       } finally {
-        // Se já temos usuário ou falhou, paramos o loading inicial da sessão
-        // O loading de dados (fetchData) acontece em background ou mostra estado vazio
+        // Importante: Sempre finaliza o loading, sucesso ou erro
         if (mounted) setIsLoading(false);
         clearTimeout(safetyTimeout);
       }
@@ -66,7 +65,7 @@ function App() {
             if (event === 'SIGNED_IN' && session?.user) {
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
-                setIsLoading(false); // Garante desbloqueio ao logar
+                setIsLoading(false); 
             } else if (event === 'SIGNED_OUT') {
                 setUser(null);
                 setClients([]); setProjects([]); setGoals([]); setTasks([]); setPayments([]);

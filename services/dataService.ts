@@ -134,15 +134,13 @@ class DataService {
     
     console.log('[DataService] UserID Detectado:', userId);
 
-    // 2. Limpeza de WhatsApp (GARANTIA DE NÚMERO LIMPO)
-    // Se o valor já vier com máscara, removemos tudo que não é dígito
+    // 2. Limpeza de WhatsApp
     let cleanWhatsapp = client.whatsapp ? client.whatsapp.toString().replace(/\D/g, '') : '';
-    // Garante prefixo 55 se tiver número
     if (cleanWhatsapp.length > 0 && !cleanWhatsapp.startsWith('55')) {
         cleanWhatsapp = '55' + cleanWhatsapp;
     }
 
-    // 3. Payload Mapeado (Snake Case) com user_id injetado
+    // 3. Payload Mapeado
     const dbPayload = { 
         name: client.name,
         whatsapp: cleanWhatsapp,
@@ -155,16 +153,28 @@ class DataService {
 
     console.log('[DataService] Enviando para Supabase (clients):', dbPayload);
 
-    // 4. Insert Direto na tabela 'clients' (Plural)
-    const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-    
-    if (error) {
-        console.error("Erro Supabase:", error);
-        throw new Error(`Erro ao salvar: ${error.message} (Code: ${error.code})`);
+    try {
+        // 4. Insert Direto na tabela 'clients' (Plural)
+        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
+        
+        if (error) {
+            console.error("Erro Supabase:", error);
+            throw error;
+        }
+        
+        console.log('[DataService] Cliente Salvo com Sucesso:', data);
+        return this.mapDbToClient(data);
+
+    } catch (err: any) {
+        console.error("Erro Capturado no addClient:", err);
+        
+        // Tratamento específico para erro de rede/Bloqueadores
+        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('Load failed'))) {
+            throw new Error("Erro de conexão. Verifique se o Adblock está desativado ou se há bloqueios de rede.");
+        }
+        
+        throw new Error(`Erro ao salvar: ${err.message || 'Erro desconhecido'}`);
     }
-    
-    console.log('[DataService] Cliente Salvo com Sucesso:', data);
-    return this.mapDbToClient(data);
   }
 
   async updateClient(client: Client): Promise<void> {
@@ -276,6 +286,9 @@ class DataService {
         const { error } = await supabase!.from('tasks').insert([payload]);
         if (error) {
             console.error("Erro Supabase (addTask):", error);
+            if (error.message && (error.message.includes('Failed to fetch'))) {
+                 throw new Error("Erro de conexão. Verifique se o Adblock está bloqueando o banco de dados.");
+            }
             throw error;
         }
         console.log('[DataService] Tarefa Salva.');

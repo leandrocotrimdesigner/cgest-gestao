@@ -70,6 +70,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     try {
         let googleEventId: string | undefined = undefined;
 
+        console.log("Tentando criar tarefa. Data:", dueDate);
+
         // 1. Integração com Google Agenda
         if (isMeeting && dueDate && meetingTime) {
           if (googleCalendarService.isAuthenticated()) {
@@ -112,9 +114,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         // Reset form
         setNewTaskTitle('');
         setSelectedProjectId('');
-        // Mantém a data de hoje para facilitar próxima inserção ou reseta? 
-        // Normalmente usuários preferem que a data persista ou volte para hoje. 
-        // Resetando para hoje:
+        // Mantém a data de hoje
         setDueDate(new Date().toISOString().split('T')[0]);
         setIsMeeting(false);
         setMeetingTime('');
@@ -238,7 +238,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
             <form onSubmit={handleAddTask} className="space-y-4">
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Descrição</label><textarea required rows={3} value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-blue-500" placeholder="Fazer..." /></div>
               
-              {/* DATE SELECTOR (Agora com valor inicial de Hoje) */}
+              {/* DATE SELECTOR (Com data de Hoje por padrão) */}
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Prazo</label><DateSelector value={dueDate} onChange={setDueDate} /></div>
               
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Projeto</label><select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className={inputClass}><option value="">Nenhum</option>{projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select></div>
