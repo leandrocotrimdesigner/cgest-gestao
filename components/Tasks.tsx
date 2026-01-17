@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, Project } from '../types';
-import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2, CalendarX } from 'lucide-react';
+import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2, CalendarX, Loader2 } from 'lucide-react';
 import { DateSelector } from './DateSelector';
 import { googleCalendarService } from '../services/googleCalendarService';
 
@@ -16,7 +16,12 @@ interface TasksProps {
 const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask, onDeleteTask }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [dueDate, setDueDate] = useState<string>('');
+  
+  // A5: Data de Hoje Automática na inicialização
+  const [dueDate, setDueDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // Loading State para Feedback Visual
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Meeting State
   const [isMeeting, setIsMeeting] = useState(false);
@@ -60,57 +65,66 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     
-    let googleEventId: string | undefined = undefined;
+    setIsSubmitting(true); // Ativa feedback visual
 
-    // 1. Integração com Google Agenda (TENTATIVA)
-    if (isMeeting && dueDate && meetingTime) {
-      if (googleCalendarService.isAuthenticated()) {
-        try {
-           const startDateStr = `${dueDate}T${meetingTime}:00`;
-           const start = new Date(startDateStr);
-           // Define duração padrão de 1 hora
-           const end = new Date(start.getTime() + 60 * 60 * 1000);
+    try {
+        let googleEventId: string | undefined = undefined;
 
-           const projectName = getProjectName(selectedProjectId);
-           const description = projectName ? `Projeto: ${projectName}` : 'Tarefa criada via CGest';
+        // 1. Integração com Google Agenda
+        if (isMeeting && dueDate && meetingTime) {
+          if (googleCalendarService.isAuthenticated()) {
+            try {
+              const startDateStr = `${dueDate}T${meetingTime}:00`;
+              const start = new Date(startDateStr);
+              const end = new Date(start.getTime() + 60 * 60 * 1000);
 
-           const response = await googleCalendarService.createEvent({
-             summary: newTaskTitle,
-             description: description,
-             start: start.toISOString(),
-             end: end.toISOString()
-           });
-           
-           if (response && response.result) {
-              googleEventId = response.result.id;
-              alert("Reunião agendada no Google Calendar com sucesso!");
-           }
-        } catch (error) {
-           console.error("Erro ao sincronizar com Google:", error);
-           alert("A tarefa será criada localmente, mas houve um erro ao sincronizar com a Agenda Google.");
+              const projectName = getProjectName(selectedProjectId);
+              const description = projectName ? `Projeto: ${projectName}` : 'Tarefa criada via CGest';
+
+              const response = await googleCalendarService.createEvent({
+                summary: newTaskTitle,
+                description: description,
+                start: start.toISOString(),
+                end: end.toISOString()
+              });
+              
+              if (response && response.result) {
+                  googleEventId = response.result.id;
+              }
+            } catch (error) {
+              console.error("Erro ao sincronizar com Google:", error);
+              alert("A tarefa será criada localmente, mas houve um erro ao sincronizar com a Agenda Google.");
+            }
+          }
         }
-      } else {
-        alert("Tarefa criada! Para sincronizar com a agenda, conecte sua conta Google na aba 'Agenda'.");
-      }
-    }
 
-    // 2. Criar a Tarefa no Sistema com o ID do Google (se existir)
-    await onAddTask({
-      title: newTaskTitle,
-      isCompleted: false,
-      projectId: selectedProjectId || undefined,
-      dueDate: dueDate || undefined,
-      isMeeting: isMeeting,
-      meetingTime: isMeeting ? meetingTime : undefined,
-      googleEventId: googleEventId
-    });
-    
-    // Reset form
-    setNewTaskTitle('');
-    setSelectedProjectId('');
-    setDueDate('');
-    setIsMeeting(false);
-    setMeetingTime('');
+        // 2. Criar a Tarefa no Sistema
+        await onAddTask({
+          title: newTaskTitle,
+          isCompleted: false,
+          projectId: selectedProjectId || undefined,
+          dueDate: dueDate || undefined,
+          isMeeting: isMeeting,
+          meetingTime: isMeeting ? meetingTime : undefined,
+          googleEventId: googleEventId
+        });
+        
+        // Reset form
+        setNewTaskTitle('');
+        setSelectedProjectId('');
+        // Mantém a data de hoje para facilitar próxima inserção ou reseta? 
+        // Normalmente usuários preferem que a data persista ou volte para hoje. 
+        // Resetando para hoje:
+        setDueDate(new Date().toISOString().split('T')[0]);
+        setIsMeeting(false);
+        setMeetingTime('');
+
+    } catch (error) {
+        console.error("Erro ao adicionar tarefa:", error);
+        alert("Erro ao salvar. Verifique o console.");
+    } finally {
+        setIsSubmitting(false); // Desativa feedback visual
+    }
   };
 
   const handleTaskDeleteRequest = (e: React.MouseEvent, task: Task) => {
@@ -118,32 +132,26 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     e.preventDefault();
 
     if (task.isMeeting) {
-        // Se for reunião, abre o modal de confirmação específico
         setMeetingToDelete(task);
     } else {
-        // Se for tarefa comum, segue o fluxo normal com Undo
         handleStandardDelete(task);
     }
   };
 
   const handleStandardDelete = (task: Task) => {
-    // Se já existe uma tarefa pendente de exclusão, confirma ela imediatamente
     if (undoTask && undoTimer) {
         clearTimeout(undoTimer);
         onDeleteTask(undoTask.id);
     }
 
-    // 1. Oculta visualmente (Otimista)
     setDeletedIds(prev => {
         const next = new Set(prev);
         next.add(task.id);
         return next;
     });
 
-    // 2. Prepara estado de Desfazer
     setUndoTask(task);
     
-    // 3. Inicia timer de 5s para confirmar exclusão real
     const timer = window.setTimeout(() => {
         onDeleteTask(task.id);
         setUndoTask(null);
@@ -156,20 +164,15 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
   const confirmMeetingDelete = async () => {
       if (!meetingToDelete) return;
 
-      // 1. Tentar excluir do Google Calendar se tiver ID
       if (meetingToDelete.googleEventId && googleCalendarService.isAuthenticated()) {
           try {
               await googleCalendarService.deleteEvent(meetingToDelete.googleEventId);
           } catch (error) {
               console.error("Erro ao excluir do Google Calendar", error);
-              alert("A tarefa foi excluída do sistema, mas não foi possível removê-la da Agenda Google (erro de API ou permissão).");
           }
       }
 
-      // 2. Excluir do Sistema (sem Undo para reuniões confirmadas no modal)
       onDeleteTask(meetingToDelete.id);
-      
-      // 3. Limpar estado
       setMeetingToDelete(null);
   };
 
@@ -234,7 +237,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
             <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={18} className="text-blue-600" />Nova Tarefa</h3>
             <form onSubmit={handleAddTask} className="space-y-4">
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Descrição</label><textarea required rows={3} value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-blue-500" placeholder="Fazer..." /></div>
+              
+              {/* DATE SELECTOR (Agora com valor inicial de Hoje) */}
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Prazo</label><DateSelector value={dueDate} onChange={setDueDate} /></div>
+              
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Projeto</label><select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className={inputClass}><option value="">Nenhum</option>{projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select></div>
               
               {/* Meeting Toggle */}
@@ -264,14 +270,21 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                   )}
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95">Adicionar</button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : null}
+                {isSubmitting ? 'Processando...' : 'Adicionar'}
+              </button>
             </form>
           </div>
         </div>
 
         <div className="lg:col-span-2 space-y-6 relative">
           
-          {/* UNDO TOAST NOTIFICATION - Repositioned inside the column */}
+          {/* UNDO TOAST NOTIFICATION */}
           {undoTask && (
             <div className="absolute top-0 right-0 z-20 animate-fadeInLeft w-full max-w-sm">
                 <div className="bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between gap-4">
@@ -299,7 +312,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                         </button>
                     </div>
                 </div>
-                {/* Progress bar for time indication */}
                 <div className="h-1 bg-slate-700 rounded-b-lg overflow-hidden mt-[-4px] mx-1">
                     <div className="h-full bg-blue-500 animate-progressBar" style={{animationDuration: '5s'}}></div>
                 </div>
@@ -322,7 +334,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                         
                         return (
                         <div key={task.id} className={`bg-white p-4 rounded-xl border flex items-start gap-4 group hover:shadow-md transition-all ${task.isCompleted ? 'border-slate-100 opacity-60' : 'border-slate-200'} relative`}>
-                            {/* Checkbox or Meeting Icon Area */}
                             <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : (isMeetingTask ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-300 hover:border-blue-500')}`}>
                                 {task.isCompleted ? <Check size={14} strokeWidth={3} /> : (isMeetingTask ? <Video size={12} /> : null)}
                             </button>
@@ -363,7 +374,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         </div>
       </div>
 
-      {/* CONFIRMATION MODAL FOR MEETING DELETION */}
       {meetingToDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setMeetingToDelete(null)}>
            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>

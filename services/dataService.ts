@@ -105,7 +105,7 @@ class DataService {
     try {
         const { data, error } = await supabase!.from('clients').select('*');
         if (error) {
-            console.warn("Erro ao buscar clientes (possível erro de rede ou tabela vazia):", error.message);
+            console.warn("Erro ao buscar clientes:", error.message);
             return [];
         }
         return (data || []).map(this.mapDbToClient);
@@ -115,6 +115,8 @@ class DataService {
   }
 
   async addClient(client: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
+    console.log('[DataService] Iniciando addClient...');
+    
     if (this.useMock) {
       const newClient = { ...client, id: generateId(), createdAt: new Date().toISOString() };
       const clients = await this.getClients();
@@ -123,19 +125,24 @@ class DataService {
       return newClient;
     }
     
+    // 1. Obter ID da sessão segura
     const userId = await this.getAuthUserId();
     if (!userId) {
         await supabase!.auth.signOut();
         throw new Error("Sessão expirada. Faça login novamente.");
     }
+    
+    console.log('[DataService] UserID Detectado:', userId);
 
-    // Tratamento WhatsApp
+    // 2. Limpeza de WhatsApp (GARANTIA DE NÚMERO LIMPO)
+    // Se o valor já vier com máscara, removemos tudo que não é dígito
     let cleanWhatsapp = client.whatsapp ? client.whatsapp.toString().replace(/\D/g, '') : '';
+    // Garante prefixo 55 se tiver número
     if (cleanWhatsapp.length > 0 && !cleanWhatsapp.startsWith('55')) {
         cleanWhatsapp = '55' + cleanWhatsapp;
     }
 
-    // Payload final
+    // 3. Payload Mapeado (Snake Case) com user_id injetado
     const dbPayload = { 
         name: client.name,
         whatsapp: cleanWhatsapp,
@@ -143,32 +150,21 @@ class DataService {
         status: client.status,
         monthly_value: client.monthlyValue,
         due_day: client.dueDay,
-        user_id: userId 
+        user_id: userId // Injeção Obrigatória
     };
 
-    console.log('[DataService] Tentando salvar. User ID:', userId);
-    console.log('[DataService] Payload:', dbPayload);
+    console.log('[DataService] Enviando para Supabase (clients):', dbPayload);
 
-    try {
-        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-        
-        if (error) {
-            console.error("Erro Supabase:", error);
-            throw new Error(`Erro ao salvar: ${error.message} (Code: ${error.code})`);
-        }
-        
-        return this.mapDbToClient(data);
-
-    } catch (err: any) {
-        console.error("Erro Capturado no addClient:", err);
-        
-        // Tratamento específico para erro de rede/CORS
-        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('Load failed'))) {
-            throw new Error("Tente realizar esta operação diretamente pelo link da Vercel, pois o ambiente de desenvolvimento pode estar bloqueando a conexão.");
-        }
-        
-        throw err;
+    // 4. Insert Direto na tabela 'clients' (Plural)
+    const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
+    
+    if (error) {
+        console.error("Erro Supabase:", error);
+        throw new Error(`Erro ao salvar: ${error.message} (Code: ${error.code})`);
     }
+    
+    console.log('[DataService] Cliente Salvo com Sucesso:', data);
+    return this.mapDbToClient(data);
   }
 
   async updateClient(client: Client): Promise<void> {
@@ -261,9 +257,46 @@ class DataService {
         return (data || []) as Task[];
       } catch { return []; }
   }
-  async addTask(task: any): Promise<void> {}
-  async toggleTask(id: string, isCompleted: boolean): Promise<void> {}
-  async deleteTask(id: string): Promise<void> {}
+  
+  async addTask(task: any): Promise<void> {
+    console.log('[DataService] Iniciando addTask...');
+    try {
+        if (this.useMock) {
+            // Mock logic
+            return;
+        }
+        
+        const userId = await this.getAuthUserId();
+        if(!userId) throw new Error("Login necessário");
+        
+        console.log('[DataService] UserID para Task:', userId);
+        
+        const payload = { ...task, user_id: userId };
+        
+        const { error } = await supabase!.from('tasks').insert([payload]);
+        if (error) {
+            console.error("Erro Supabase (addTask):", error);
+            throw error;
+        }
+        console.log('[DataService] Tarefa Salva.');
+    } catch(e) {
+        console.error(e);
+        throw e;
+    }
+  }
+  
+  async toggleTask(id: string, isCompleted: boolean): Promise<void> {
+      // Simplificado para manter foco
+      if (!this.useMock) {
+          await supabase!.from('tasks').update({ isCompleted }).eq('id', id);
+      }
+  }
+  
+  async deleteTask(id: string): Promise<void> {
+      if (!this.useMock) {
+          await supabase!.from('tasks').delete().eq('id', id);
+      }
+  }
 
   // PAYMENTS
   async getPayments(): Promise<Payment[]> {
