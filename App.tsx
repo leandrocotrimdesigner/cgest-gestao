@@ -32,7 +32,7 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // Timeout de Emergência (3s): Destrava a UI rapidamente se a conexão for lenta/bloqueada
+    // Timeout de Emergência (3s)
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
             console.warn("Inicialização lenta: Forçando desbloqueio da UI (3s).");
@@ -49,7 +49,6 @@ function App() {
       } catch (error) {
         console.error("Falha ao verificar sessão:", error);
       } finally {
-        // Importante: Sempre finaliza o loading, sucesso ou erro
         if (mounted) setIsLoading(false);
         clearTimeout(safetyTimeout);
       }
@@ -89,16 +88,15 @@ function App() {
     if (!user) return;
     
     try {
-      // Carregamento paralelo resiliente: Se um falhar, os outros continuam
+      // GOALS REMOVIDO para evitar erro 404 travando o app
       const results = await Promise.allSettled([
         dataService.getClients(),
         dataService.getProjects(),
-        dataService.getGoals(),
+        // dataService.getGoals(), // Desativado temporariamente
         dataService.getTasks(),
         dataService.getPayments()
       ]);
 
-      // Helper para extrair dados ou retornar array vazio (Proteção contra null)
       const getData = <T,>(result: PromiseSettledResult<T[]>) => {
         if (result.status === 'fulfilled' && Array.isArray(result.value)) {
             return result.value;
@@ -108,14 +106,14 @@ function App() {
 
       setClients(getData(results[0]));
       setProjects(getData(results[1]));
-      setGoals(getData(results[2]));
-      setTasks(getData(results[3]));
-      setPayments(getData(results[4]));
+      // setGoals(getData(results[2])); 
+      setGoals([]); // Goals vazio
+      setTasks(getData(results[2])); // Ajustado indice
+      setPayments(getData(results[3])); // Ajustado indice
 
     } catch (error) {
       console.error("Critical error fetching data", error);
     } finally {
-      // Garante que o loading seja removido mesmo com erro no fetch
       setIsLoading(false);
     }
   };
@@ -148,7 +146,6 @@ function App() {
       setUser(savedUser);
   };
 
-  // --- Handlers ---
   const handleAddClient = async (clientData: any) => { await dataService.addClient(clientData); fetchData(); };
   const handleUpdateClient = async (clientData: Client) => { await dataService.updateClient(clientData); fetchData(); };
   const handleDeleteClient = async (id: string) => { await dataService.deleteClient(id); fetchData(); };
@@ -174,7 +171,6 @@ function App() {
       );
   }
 
-  // Route Protection: If no user, show Login
   if (!user) {
     return (
       <ToastProvider>
@@ -196,7 +192,6 @@ function App() {
         />
 
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-          {/* Mobile Header */}
           <header className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden sticky top-0 z-10">
             <div className="flex items-center gap-3">
                <button onClick={() => setIsMobileOpen(true)} className="text-slate-600 hover:text-slate-900">
