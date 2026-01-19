@@ -21,24 +21,21 @@ function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Data State Initialized as Empty Arrays
+  // Data State
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
 
-  // Auth & Session Persistence Logic
   useEffect(() => {
     let mounted = true;
 
-    // Timeout de Emergência (3s)
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
-            console.warn("Inicialização lenta: Forçando desbloqueio da UI (3s).");
             setIsLoading(false);
         }
-    }, 3000);
+    }, 2000);
 
     const checkSession = async () => {
       try {
@@ -55,12 +52,10 @@ function App() {
     };
     checkSession();
 
-    // Listen for auth changes
     let subscription: any = null;
     if (supabase) {
         const authData = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return;
-            
             if (event === 'SIGNED_IN' && session?.user) {
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
@@ -83,16 +78,13 @@ function App() {
     };
   }, []);
 
-  // Fetch data only when user is authenticated
   const fetchData = async () => {
     if (!user) return;
-    
     try {
-      // GOALS REMOVIDO para evitar erro 404 travando o app
+      // Carrega apenas dados reais e estáveis
       const results = await Promise.allSettled([
         dataService.getClients(),
         dataService.getProjects(),
-        // dataService.getGoals(), // Desativado temporariamente
         dataService.getTasks(),
         dataService.getPayments()
       ]);
@@ -106,13 +98,12 @@ function App() {
 
       setClients(getData(results[0]));
       setProjects(getData(results[1]));
-      // setGoals(getData(results[2])); 
-      setGoals([]); // Goals vazio
-      setTasks(getData(results[2])); // Ajustado indice
-      setPayments(getData(results[3])); // Ajustado indice
+      setTasks(getData(results[2]));
+      setPayments(getData(results[3]));
+      setGoals([]); // Goals silenciado
 
     } catch (error) {
-      console.error("Critical error fetching data", error);
+      console.error("Erro fetch data", error);
     } finally {
       setIsLoading(false);
     }
@@ -146,19 +137,24 @@ function App() {
       setUser(savedUser);
   };
 
+  // Handlers
   const handleAddClient = async (clientData: any) => { await dataService.addClient(clientData); fetchData(); };
   const handleUpdateClient = async (clientData: Client) => { await dataService.updateClient(clientData); fetchData(); };
   const handleDeleteClient = async (id: string) => { await dataService.deleteClient(id); fetchData(); };
+  
   const handleAddProject = async (projectData: any) => { await dataService.addProject(projectData); fetchData(); };
   const handleUpdateProjectStatus = async (id: string, status: any) => { await dataService.updateProjectStatus(id, status); fetchData(); };
   const handleUpdateProjectPaymentStatus = async (id: string, status: PaymentStatus) => { await dataService.updateProjectPaymentStatus(id, status); fetchData(); };
   const handleDeleteProject = async (id: string) => { await dataService.deleteProject(id); fetchData(); };
+  
   const handleAddGoal = async (goalData: any) => { await dataService.addGoal(goalData); fetchData(); };
   const handleDeleteGoal = async (id: string) => { await dataService.deleteGoal(id); fetchData(); };
   const handleUpdateGoal = async (goal: Goal) => { await dataService.updateGoal(goal); fetchData(); };
+  
   const handleAddTask = async (taskData: any) => { await dataService.addTask(taskData); fetchData(); };
   const handleToggleTask = async (id: string, isCompleted: boolean) => { await dataService.toggleTask(id, isCompleted); fetchData(); };
   const handleDeleteTask = async (id: string) => { await dataService.deleteTask(id); fetchData(); };
+  
   const handleAddPayment = async (paymentData: any) => { await dataService.addPayment(paymentData); fetchData(); };
   const handleUpdatePayment = async (payment: Payment) => { await dataService.updatePayment(payment); fetchData(); };
 
@@ -239,7 +235,7 @@ function App() {
                 />
               )}
               {activeTab === 'agenda' && (
-                <Agenda />
+                <Agenda tasks={tasks} projects={projects} />
               )}
               {activeTab === 'goals' && (
                 <Goals 

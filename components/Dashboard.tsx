@@ -2,8 +2,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Client, Project, Goal, Task, Payment } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock, MessageCircle } from 'lucide-react';
-import Goals from './Goals'; // Reusing the Goals component
+import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock } from 'lucide-react';
+import Goals from './Goals'; 
 
 interface DashboardProps {
   clients: Client[];
@@ -13,7 +13,6 @@ interface DashboardProps {
   payments: Payment[]; 
   onAddTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>; 
   onToggleTask: (id: string, isCompleted: boolean) => Promise<void>;
-  // Goals props
   onAddGoal: (goal: Omit<Goal, 'id'>) => Promise<void>;
   onDeleteGoal: (id: string) => Promise<void>;
   onUpdateGoal: (goal: Goal) => Promise<void>;
@@ -117,29 +116,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const handleWhatsAppCharge = (e: React.MouseEvent, payment: Payment) => {
-      e.stopPropagation();
-      const client = (clients || []).find(c => c.id === payment.clientId);
-      
-      if (!client || !client.whatsapp) {
-          alert("Este cliente não possui um número de WhatsApp cadastrado.");
-          return;
-      }
-
-      // Limpa caracteres não numéricos
-      const phone = client.whatsapp.replace(/\D/g, '');
-      
-      const formattedDate = new Date(payment.dueDate).toLocaleDateString('pt-BR');
-      const formattedValue = formatCurrency(payment.value);
-      const description = payment.description || 'serviços prestados';
-
-      // MENSAGEM COM CHAVE PIX CORRETA
-      const message = `Olá ${client.name}, passando para lembrar do pagamento referente ao projeto ${description}, no valor de ${formattedValue}, que venceu em ${formattedDate}. Segue minha chave PIX para pagamento: 62981607346 (Leandro Alves).`;
-      
-      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(url, '_blank');
-  };
-
   const handleBarClick = (data: any) => {
     if (data && data.activePayload && data.activePayload.length > 0) {
         setSelectedDate(data.activePayload[0].payload.date);
@@ -241,9 +217,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button type="button" onClick={(e) => handleWhatsAppCharge(e, payment)} className="text-green-600 bg-white hover:bg-green-100 p-1.5 rounded-md shadow-sm transition-colors border border-green-200" title="Cobrar via WhatsApp">
-                                    <MessageCircle size={14} />
-                                </button>
                                 <button type="button" onClick={(e) => handleDeleteAlertRequest(e, payment.id)} className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100">
                                     <Trash2 size={14} />
                                 </button>

@@ -3,9 +3,6 @@ import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from '../ty
 import { supabase } from './supabaseClient';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const todayStr = new Date().toISOString().split('T')[0];
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 class DataService {
   private useMock: boolean;
@@ -32,10 +29,10 @@ class DataService {
       return {
           id: record.id,
           name: record.name,
-          whatsapp: record.whatsapp,
+          // Whatsapp removido
           type: record.contract_type || 'avulso', 
           status: record.status || 'active',
-          // monthlyValue e dueDay removidos do mapeamento principal se não existirem no banco
+          // Leitura segura (pode vir null do banco)
           monthlyValue: record.monthly_value ? Number(record.monthly_value) : undefined,
           dueDay: record.due_day ? Number(record.due_day) : undefined,
           createdAt: record.created_at || new Date().toISOString()
@@ -45,11 +42,12 @@ class DataService {
   private mapDbToTask(record: any): Task {
       return {
           id: record.id,
-          title: record.description, // Banco usa 'description'
-          isCompleted: record.completed, // Banco usa 'completed'
+          title: record.description || record.title || 'Sem título',
+          isCompleted: record.completed || false,
           projectId: record.project_id,
           dueDate: record.due_date,
-          isMeeting: record.is_meeting,
+          isMeeting: record.is_meeting || false,
+          meetingTime: record.meeting_time, 
           createdAt: record.created_at
       };
   }
@@ -66,47 +64,9 @@ class DataService {
   private async getAuthUserId(): Promise<string | null> {
       const { data, error } = await supabase!.auth.getSession();
       if (error || !data.session?.user) {
-          console.warn("Sessão inválida:", error);
           return null;
       }
       return data.session.user.id;
-  }
-
-  // --- GENERIC UPSERT LOGIC FOR PAYMENTS ---
-  async upsertPayment(payment: Partial<Payment> & { clientId: string, dueDate: string }): Promise<Payment> {
-    if (this.useMock) {
-        await delay(100);
-        return { ...payment, id: generateId() } as Payment;
-    } else {
-         const userId = await this.getAuthUserId();
-         if (!userId) { await supabase!.auth.signOut(); throw new Error("Sessão inválida."); }
-
-         const payload = { ...payment, user_id: userId };
-         
-         if (payment.id) {
-             const { error } = await supabase!.from('payments').update(payload).eq('id', payment.id);
-             if (error) throw new Error(`Erro ao atualizar: ${error.message}`);
-             return payload as Payment;
-         } else {
-             const { data, error } = await supabase!.from('payments').insert([payload]).select().single();
-             if (error) throw new Error(`Erro ao criar: ${error.message}`);
-             return data as Payment;
-         }
-    }
-  }
-
-  // --- BACKUP ---
-  async getBackupData(): Promise<any> {
-      if (this.useMock) {
-          return { clients: JSON.parse(localStorage.getItem('cgest_clients') || '[]') };
-      }
-      return null;
-  }
-
-  async restoreBackupData(data: any): Promise<void> {
-      if (this.useMock && data) {
-          if(Array.isArray(data.clients)) localStorage.setItem('cgest_clients', JSON.stringify(data.clients));
-      }
   }
 
   // --- CRUD WRAPPERS ---
@@ -124,8 +84,9 @@ class DataService {
     }
   }
 
+  // --- CRÍTICO: Payload Limpo para evitar erro 400 ---
   async addClient(client: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
-    console.log('[DataService] Iniciando addClient (Correção Colunas)...');
+    console.log('[DataService] Add Client Limpo');
     
     if (this.useMock) {
       const newClient = { ...client, id: generateId(), createdAt: new Date().toISOString() };
@@ -133,46 +94,35 @@ class DataService {
     }
     
     const userId = await this.getAuthUserId();
-    if (!userId) {
-        await supabase!.auth.signOut();
-        throw new Error("Sessão expirada.");
-    }
+    if (!userId) throw new Error("Sessão expirada.");
 
-    let cleanWhatsapp = client.whatsapp ? client.whatsapp.toString().replace(/\D/g, '') : '';
-    if (cleanWhatsapp.length > 0 && !cleanWhatsapp.startsWith('55')) {
-        cleanWhatsapp = '55' + cleanWhatsapp;
-    }
-
-    // CORREÇÃO CRÍTICA: Enviando APENAS as colunas que existem no banco
+    // Payload estrito: Apenas colunas que temos certeza que existem
     const dbPayload = { 
         name: client.name,
-        whatsapp: cleanWhatsapp,
         contract_type: client.type,
         status: client.status,
         user_id: userId
-        // REMOVIDO: monthly_value, due_day (Colunas não existem no Supabase)
+        // REMOVIDO: monthly_value, due_day, whatsapp
     };
 
-    console.log('[DataService] Payload Client:', dbPayload);
-
-    try {
-        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-        if (error) throw error;
-        return this.mapDbToClient(data);
-    } catch (err: any) {
-        console.error("Erro addClient:", err);
-        throw new Error(`Erro ao salvar cliente: ${err.message}`);
+    const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
+    
+    if (error) {
+        console.error("Erro Supabase addClient:", error);
+        throw error;
     }
+    return this.mapDbToClient(data);
   }
 
   async updateClient(client: Client): Promise<void> {
-      // Implementação simplificada para evitar erros
+       if(this.useMock) return;
+       // Simplificado para update básico sem WhatsApp
+       const { error } = await supabase!.from('clients').update({ name: client.name }).eq('id', client.id);
   }
 
   async deleteClient(id: string): Promise<void> {
     if(this.useMock) return;
-    const { error } = await supabase!.from('clients').delete().eq('id', id);
-    if (error) throw new Error(`Erro ao excluir: ${error.message}`);
+    await supabase!.from('clients').delete().eq('id', id);
   }
 
   // PROJECTS
@@ -190,7 +140,16 @@ class DataService {
         if (this.useMock) return { ...project, id: generateId() };
         const userId = await this.getAuthUserId();
         if(!userId) throw new Error("Login necessario");
-        const payload = { ...project, user_id: userId };
+        
+        const payload = { 
+            name: project.name,
+            client_id: project.clientId,
+            status: project.status,
+            payment_status: project.paymentStatus,
+            budget: project.budget,
+            user_id: userId 
+        };
+        
         const { data, error } = await supabase!.from('projects').insert([payload]).select().single();
         if(error) throw error;
         return data as Project;
@@ -199,13 +158,21 @@ class DataService {
       }
   }
 
-  async updateProjectStatus(id: string, status: any): Promise<void> { /* ... */ }
-  async updateProjectPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> { /* ... */ }
-  async deleteProject(id: string): Promise<void> { /* ... */ }
+  async updateProjectStatus(id: string, status: any): Promise<void> {
+      if(!this.useMock) await supabase!.from('projects').update({ status }).eq('id', id);
+  }
+  
+  async updateProjectPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> { 
+      if(!this.useMock) await supabase!.from('projects').update({ payment_status: paymentStatus }).eq('id', id);
+  }
+  
+  async deleteProject(id: string): Promise<void> { 
+      if(!this.useMock) await supabase!.from('projects').delete().eq('id', id);
+  }
 
-  // GOALS (DESATIVADO PARA EVITAR 404)
+  // GOALS
   async getGoals(): Promise<Goal[]> {
-      return []; // Retorna vazio imediatamente
+      return []; 
   }
   async addGoal(goal: any): Promise<void> {}
   async updateGoal(goal: Goal): Promise<void> {}
@@ -215,7 +182,6 @@ class DataService {
   async getTasks(): Promise<Task[]> {
       try {
         if (this.useMock) return [];
-        // Mapeamento correto na leitura também
         const { data, error } = await supabase!.from('tasks').select('*');
         if (error) return [];
         return (data || []).map(this.mapDbToTask);
@@ -223,36 +189,28 @@ class DataService {
   }
   
   async addTask(task: any): Promise<void> {
-    console.log('[DataService] Iniciando addTask (Correção Colunas)...');
     try {
         if (this.useMock) return;
-        
         const userId = await this.getAuthUserId();
         if(!userId) throw new Error("Login necessário");
         
-        // CORREÇÃO CRÍTICA: Mapeamento exato das colunas do banco
         const dbPayload = {
-            description: task.title,      // UI: title -> DB: description
-            due_date: task.dueDate,       // UI: dueDate -> DB: due_date
-            completed: task.isCompleted || false, // UI: isCompleted -> DB: completed
-            is_meeting: task.isMeeting || false,  // UI: isMeeting -> DB: is_meeting
+            description: task.title,
+            due_date: task.dueDate,
+            completed: task.isCompleted || false,
+            is_meeting: task.isMeeting || false,
             user_id: userId
         };
         
-        console.log('[DataService] Payload Task:', dbPayload);
-
         const { error } = await supabase!.from('tasks').insert([dbPayload]);
         if (error) throw error;
-
     } catch(e: any) {
-        console.error("Erro addTask:", e);
         throw new Error(`Erro ao salvar tarefa: ${e.message}`);
     }
   }
   
   async toggleTask(id: string, isCompleted: boolean): Promise<void> {
       if (!this.useMock) {
-          // Mapeamento completed
           await supabase!.from('tasks').update({ completed: isCompleted }).eq('id', id);
       }
   }
@@ -272,8 +230,26 @@ class DataService {
         return (data || []) as Payment[];
       } catch { return []; }
   }
-  async addPayment(payment: any): Promise<void> {}
-  async updatePayment(payment: Payment): Promise<void> {}
+  
+  async addPayment(payment: any): Promise<void> {
+      if(!this.useMock) {
+          const userId = await this.getAuthUserId();
+          const payload = { ...payment, user_id: userId };
+          await supabase!.from('payments').insert([payload]);
+      }
+  }
+  
+  async updatePayment(payment: Payment): Promise<void> {
+      if(!this.useMock) {
+         await supabase!.from('payments').update({ 
+             status: payment.status, 
+             value: payment.value,
+             description: payment.description,
+             paid_at: payment.paidAt,
+             receipt_url: payment.receiptUrl
+         }).eq('id', payment.id);
+      }
+  }
 
   // --- AUTH ---
   async login(email: string, pass: string): Promise<User> {
@@ -303,6 +279,61 @@ class DataService {
       const { data, error } = await supabase!.auth.updateUser(updates);
       if (error) throw error;
       return this.mapSupabaseUser(data.user);
+  }
+
+  // --- BACKUP & RESTORE ---
+  
+  async getBackupData(): Promise<any> {
+    if (this.useMock) {
+        return {
+            clients: JSON.parse(localStorage.getItem('cgest_clients') || '[]'),
+            projects: JSON.parse(localStorage.getItem('cgest_projects') || '[]'),
+            goals: JSON.parse(localStorage.getItem('cgest_goals') || '[]'),
+            tasks: JSON.parse(localStorage.getItem('cgest_tasks') || '[]'),
+            payments: JSON.parse(localStorage.getItem('cgest_payments') || '[]'),
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    const { data: clients } = await supabase!.from('clients').select('*');
+    const { data: projects } = await supabase!.from('projects').select('*');
+    const { data: tasks } = await supabase!.from('tasks').select('*');
+    const { data: payments } = await supabase!.from('payments').select('*');
+
+    return {
+        clients: clients || [],
+        projects: projects || [],
+        tasks: tasks || [],
+        payments: payments || [],
+        timestamp: new Date().toISOString()
+    };
+  }
+
+  async restoreBackupData(backup: any): Promise<void> {
+    if (this.useMock) {
+        if(backup.clients) localStorage.setItem('cgest_clients', JSON.stringify(backup.clients));
+        if(backup.projects) localStorage.setItem('cgest_projects', JSON.stringify(backup.projects));
+        if(backup.goals) localStorage.setItem('cgest_goals', JSON.stringify(backup.goals));
+        if(backup.tasks) localStorage.setItem('cgest_tasks', JSON.stringify(backup.tasks));
+        if(backup.payments) localStorage.setItem('cgest_payments', JSON.stringify(backup.payments));
+        return;
+    }
+
+    const userId = await this.getAuthUserId();
+    if (!userId) throw new Error("Usuário não autenticado.");
+
+    // Clean existing data for this user
+    await supabase!.from('payments').delete().eq('user_id', userId);
+    await supabase!.from('tasks').delete().eq('user_id', userId);
+    await supabase!.from('projects').delete().eq('user_id', userId);
+    await supabase!.from('clients').delete().eq('user_id', userId);
+
+    const injectUser = (arr: any[]) => arr.map(item => ({ ...item, user_id: userId }));
+
+    if (backup.clients?.length) await supabase!.from('clients').insert(injectUser(backup.clients));
+    if (backup.projects?.length) await supabase!.from('projects').insert(injectUser(backup.projects));
+    if (backup.tasks?.length) await supabase!.from('tasks').insert(injectUser(backup.tasks));
+    if (backup.payments?.length) await supabase!.from('payments').insert(injectUser(backup.payments));
   }
 }
 
