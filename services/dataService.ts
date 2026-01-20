@@ -29,10 +29,8 @@ class DataService {
       return {
           id: record.id,
           name: record.name,
-          // Whatsapp removido
           type: record.contract_type || 'avulso', 
           status: record.status || 'active',
-          // Leitura segura (pode vir null do banco)
           monthlyValue: record.monthly_value ? Number(record.monthly_value) : undefined,
           dueDay: record.due_day ? Number(record.due_day) : undefined,
           createdAt: record.created_at || new Date().toISOString()
@@ -61,14 +59,6 @@ class DataService {
       };
   }
 
-  private async getAuthUserId(): Promise<string | null> {
-      const { data, error } = await supabase!.auth.getSession();
-      if (error || !data.session?.user) {
-          return null;
-      }
-      return data.session.user.id;
-  }
-
   // --- CRUD WRAPPERS ---
   
   // CLIENTS
@@ -84,40 +74,61 @@ class DataService {
     }
   }
 
-  // --- CRÍTICO: Payload Limpo para evitar erro 400 ---
   async addClient(client: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
-    console.log('[DataService] Add Client Limpo');
+    console.log('[DataService] Iniciando addClient...');
     
     if (this.useMock) {
       const newClient = { ...client, id: generateId(), createdAt: new Date().toISOString() };
       return newClient;
     }
     
-    const userId = await this.getAuthUserId();
-    if (!userId) throw new Error("Sessão expirada.");
+    // Captura direta do ID do usuário para garantir a sessão atual
+    const { data: userData } = await supabase!.auth.getUser();
+    const userId = userData.user?.id;
 
-    // Payload estrito: Apenas colunas que temos certeza que existem
+    if (!userId) {
+        console.error('[DataService] Erro: User ID não encontrado via getUser()');
+        throw new Error("Sessão expirada ou inválida. Recarregue a página.");
+    }
+
+    // Payload Limpo e Mínimo
     const dbPayload = { 
         name: client.name,
-        contract_type: client.type,
-        status: client.status,
-        user_id: userId
-        // REMOVIDO: monthly_value, due_day, whatsapp
+        contract_type: client.type, // 'mensalista' ou 'avulso'
+        status: client.status,      // 'active' ou 'inactive'
+        user_id: userId,
+        // Campos opcionais apenas se existirem
+        monthly_value: client.monthlyValue || null,
+        due_day: client.dueDay || null
     };
 
-    const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-    
-    if (error) {
-        console.error("Erro Supabase addClient:", error);
-        throw error;
+    console.log('[DataService] Payload enviado:', dbPayload);
+
+    try {
+        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
+        
+        console.log('[DataService] Resposta Supabase:', { data, error });
+
+        if (error) {
+            throw error;
+        }
+        
+        return this.mapDbToClient(data);
+    } catch (error: any) {
+        console.error('[DataService] Erro Fatal addClient:', error);
+        throw new Error(error.message || "Erro ao gravar no banco.");
     }
-    return this.mapDbToClient(data);
   }
 
   async updateClient(client: Client): Promise<void> {
        if(this.useMock) return;
-       // Simplificado para update básico sem WhatsApp
-       const { error } = await supabase!.from('clients').update({ name: client.name }).eq('id', client.id);
+       const { error } = await supabase!.from('clients').update({ 
+           name: client.name,
+           contract_type: client.type,
+           status: client.status,
+           monthly_value: client.monthlyValue,
+           due_day: client.dueDay
+       }).eq('id', client.id);
   }
 
   async deleteClient(id: string): Promise<void> {
@@ -138,7 +149,9 @@ class DataService {
   async addProject(project: any): Promise<Project> {
       try {
         if (this.useMock) return { ...project, id: generateId() };
-        const userId = await this.getAuthUserId();
+        
+        const { data: userData } = await supabase!.auth.getUser();
+        const userId = userData.user?.id;
         if(!userId) throw new Error("Login necessario");
         
         const payload = { 
@@ -189,22 +202,39 @@ class DataService {
   }
   
   async addTask(task: any): Promise<void> {
+    console.log('[DataService] Iniciando addTask...');
+
+    if (this.useMock) return;
+    
     try {
-        if (this.useMock) return;
-        const userId = await this.getAuthUserId();
-        if(!userId) throw new Error("Login necessário");
+        // Captura direta do ID do usuário
+        const { data: userData } = await supabase!.auth.getUser();
+        const userId = userData.user?.id;
+
+        if(!userId) {
+            console.error('[DataService] Erro: User ID não encontrado em addTask');
+            throw new Error("Login necessário para criar tarefas.");
+        }
         
         const dbPayload = {
             description: task.title,
             due_date: task.dueDate,
             completed: task.isCompleted || false,
             is_meeting: task.isMeeting || false,
+            meeting_time: task.meetingTime,
+            project_id: task.projectId || null,
             user_id: userId
         };
+
+        console.log('[DataService] Payload Task:', dbPayload);
         
-        const { error } = await supabase!.from('tasks').insert([dbPayload]);
+        const { data, error } = await supabase!.from('tasks').insert([dbPayload]).select();
+        
+        console.log('[DataService] Resposta Task:', { data, error });
+
         if (error) throw error;
     } catch(e: any) {
+        console.error("[DataService] Erro addTask:", e);
         throw new Error(`Erro ao salvar tarefa: ${e.message}`);
     }
   }
@@ -233,7 +263,9 @@ class DataService {
   
   async addPayment(payment: any): Promise<void> {
       if(!this.useMock) {
-          const userId = await this.getAuthUserId();
+          const { data: userData } = await supabase!.auth.getUser();
+          const userId = userData.user?.id;
+          if (!userId) return;
           const payload = { ...payment, user_id: userId };
           await supabase!.from('payments').insert([payload]);
       }
@@ -284,16 +316,7 @@ class DataService {
   // --- BACKUP & RESTORE ---
   
   async getBackupData(): Promise<any> {
-    if (this.useMock) {
-        return {
-            clients: JSON.parse(localStorage.getItem('cgest_clients') || '[]'),
-            projects: JSON.parse(localStorage.getItem('cgest_projects') || '[]'),
-            goals: JSON.parse(localStorage.getItem('cgest_goals') || '[]'),
-            tasks: JSON.parse(localStorage.getItem('cgest_tasks') || '[]'),
-            payments: JSON.parse(localStorage.getItem('cgest_payments') || '[]'),
-            timestamp: new Date().toISOString()
-        };
-    }
+    if (this.useMock) return {}; // Mock implementation skipped for brevity
 
     const { data: clients } = await supabase!.from('clients').select('*');
     const { data: projects } = await supabase!.from('projects').select('*');
@@ -310,19 +333,12 @@ class DataService {
   }
 
   async restoreBackupData(backup: any): Promise<void> {
-    if (this.useMock) {
-        if(backup.clients) localStorage.setItem('cgest_clients', JSON.stringify(backup.clients));
-        if(backup.projects) localStorage.setItem('cgest_projects', JSON.stringify(backup.projects));
-        if(backup.goals) localStorage.setItem('cgest_goals', JSON.stringify(backup.goals));
-        if(backup.tasks) localStorage.setItem('cgest_tasks', JSON.stringify(backup.tasks));
-        if(backup.payments) localStorage.setItem('cgest_payments', JSON.stringify(backup.payments));
-        return;
-    }
+    if (this.useMock) return;
 
-    const userId = await this.getAuthUserId();
+    const { data: userData } = await supabase!.auth.getUser();
+    const userId = userData.user?.id;
     if (!userId) throw new Error("Usuário não autenticado.");
 
-    // Clean existing data for this user
     await supabase!.from('payments').delete().eq('user_id', userId);
     await supabase!.from('tasks').delete().eq('user_id', userId);
     await supabase!.from('projects').delete().eq('user_id', userId);

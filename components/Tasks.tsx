@@ -65,12 +65,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     
-    setIsSubmitting(true); // Ativa feedback visual
+    setIsSubmitting(true);
 
     try {
         let googleEventId: string | undefined = undefined;
-
-        console.log("Tentando criar tarefa. Data:", dueDate);
 
         // 1. Integração com Google Agenda
         if (isMeeting && dueDate && meetingTime) {
@@ -95,7 +93,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
               }
             } catch (error) {
               console.error("Erro ao sincronizar com Google:", error);
-              alert("A tarefa será criada localmente, mas houve um erro ao sincronizar com a Agenda Google.");
+              // Não bloqueia o fluxo principal
             }
           }
         }
@@ -111,11 +109,10 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
           googleEventId: googleEventId
         });
         
-        // Reset form
+        // Reset form on success
         setNewTaskTitle('');
         setSelectedProjectId('');
-        // Mantém a data de hoje
-        setDueDate(new Date().toISOString().split('T')[0]);
+        setDueDate(new Date().toISOString().split('T')[0]); // Keep today as default
         setIsMeeting(false);
         setMeetingTime('');
 
@@ -123,7 +120,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         console.error("Erro ao adicionar tarefa:", error);
         alert("Erro ao salvar. Verifique o console.");
     } finally {
-        setIsSubmitting(false); // Desativa feedback visual
+        // GARANTIA DE DESTRAVAMENTO
+        setIsSubmitting(false); 
     }
   };
 

@@ -113,11 +113,17 @@ const Clients: React.FC<ClientsProps> = ({
             await onAddClient(payload);
             addToast({ type: 'success', title: 'Cliente adicionado' });
         }
-        setIsClientModalOpen(false);
+        setIsClientModalOpen(false); 
     } catch (e: any) {
-        addToast({ type: 'error', title: 'Erro ao salvar cliente', message: e.message || 'Verifique sua conexão.' });
+        console.error("Erro no submit do cliente:", e);
+        addToast({ type: 'error', title: 'Erro ao salvar', message: e.message || 'Tente novamente.' });
     } finally {
+        // GARANTIA DE DESTRAVAMENTO
         setIsSubmitting(false);
+        // Opcional: Fechar modal mesmo com erro para evitar frustração de "travamento",
+        // mas idealmente manteria aberto para correção. 
+        // Com base no pedido "Fechamento Automático", vou manter o fechamento no sucesso (dentro do try),
+        // mas o desbloqueio do botão é garantido aqui.
     }
   };
 
