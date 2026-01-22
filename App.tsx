@@ -13,7 +13,7 @@ import Agenda from './components/Agenda';
 import { dataService } from './services/dataService';
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from './types';
 import { ToastProvider } from './components/ToastContext';
-import { supabase } from './services/supabaseClient';
+import { auth } from './services/firebaseClient';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -31,62 +31,58 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
+    // Timeout de segurança
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
+            console.warn("Timeout de carregamento. Liberando interface.");
             setIsLoading(false);
         }
-    }, 2000);
+    }, 4000);
 
-    const checkSession = async () => {
-      try {
-        const currentUser = await dataService.getCurrentUser();
-        if (mounted && currentUser) {
-            setUser(currentUser);
-        }
-      } catch (error) {
-        console.error("Falha ao verificar sessão:", error);
-      } finally {
-        if (mounted) setIsLoading(false);
-        clearTimeout(safetyTimeout);
-      }
-    };
-    checkSession();
-
-    let subscription: any = null;
-    if (supabase) {
-        const authData = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Firebase Auth Listener
+    let unsubscribe = () => {};
+    
+    if (auth) {
+        unsubscribe = auth.onAuthStateChanged(async (u: any) => {
             if (!mounted) return;
-            if (event === 'SIGNED_IN' && session?.user) {
+            if (u) {
+                setUser({ 
+                    id: u.uid, 
+                    email: u.email || '', 
+                    name: u.displayName || 'Usuário', 
+                    avatar: u.photoURL || '' 
+                });
+            } else {
+                // Se não houver usuário logado no Firebase, verificamos se estamos em modo Mock
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
-                setIsLoading(false); 
-            } else if (event === 'SIGNED_OUT') {
-                setUser(null);
-                setClients([]); setProjects([]); setGoals([]); setTasks([]); setPayments([]);
-                setIsLoading(false);
             }
+            setIsLoading(false);
         });
-        subscription = authData.data.subscription;
     } else {
-        if (mounted) setIsLoading(false);
+        // Fallback para modo Mock imediato
+        dataService.getCurrentUser().then(u => {
+            if(mounted) setUser(u);
+            setIsLoading(false);
+        });
     }
 
     return () => {
         mounted = false;
         clearTimeout(safetyTimeout);
-        if (subscription) subscription.unsubscribe();
+        unsubscribe();
     };
   }, []);
 
   const fetchData = async () => {
     if (!user) return;
     try {
-      // Carrega apenas dados reais e estáveis
       const results = await Promise.allSettled([
         dataService.getClients(),
         dataService.getProjects(),
         dataService.getTasks(),
-        dataService.getPayments()
+        dataService.getPayments(),
+        dataService.getGoals()
       ]);
 
       const getData = <T,>(result: PromiseSettledResult<T[]>) => {
@@ -100,12 +96,10 @@ function App() {
       setProjects(getData(results[1]));
       setTasks(getData(results[2]));
       setPayments(getData(results[3]));
-      setGoals([]); // Goals silenciado
+      setGoals(getData(results[4]));
 
     } catch (error) {
-      console.error("Erro fetch data", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Erro geral no fetch data", error);
     }
   };
 
@@ -168,11 +162,11 @@ function App() {
   }
 
   if (!user) {
-    return (
-      <ToastProvider>
-        <Login onLogin={handleLogin} />
-      </ToastProvider>
-    );
+     return (
+        <ToastProvider>
+           <Login onLogin={handleLogin} />
+        </ToastProvider>
+     );
   }
 
   return (

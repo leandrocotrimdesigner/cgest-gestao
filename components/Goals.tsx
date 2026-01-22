@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Goal } from '../types';
-import { Plus, Trash2, Target, Calendar, Edit2, Check, AlertTriangle, X } from 'lucide-react';
+import { Plus, Trash2, Target, Calendar, Edit2, Check, AlertTriangle, X, Loader2 } from 'lucide-react';
 
 interface GoalsProps {
   goals: Goal[];
@@ -17,6 +17,8 @@ const Goals: React.FC<GoalsProps> = ({ goals, onAddGoal, onDeleteGoal, onUpdateG
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [formData, setFormData] = useState({ description: '', targetValue: 0, currentValue: 0, deadline: '' });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -48,20 +50,28 @@ const Goals: React.FC<GoalsProps> = ({ goals, onAddGoal, onDeleteGoal, onUpdateG
     e.preventDefault();
     if (!formData.description || !formData.targetValue) return;
 
-    const payload = {
-      description: formData.description,
-      targetValue: Number(formData.targetValue),
-      currentValue: Number(formData.currentValue),
-      deadline: formData.deadline
-    };
-
-    if (editingGoal) {
-      await onUpdateGoal({ ...editingGoal, ...payload });
-    } else {
-      await onAddGoal({ ...payload, currentValue: payload.currentValue || 0 });
-    }
+    setIsSubmitting(true);
     
-    setIsModalOpen(false);
+    try {
+        const payload = {
+            description: formData.description,
+            targetValue: Number(formData.targetValue),
+            currentValue: Number(formData.currentValue),
+            deadline: formData.deadline
+        };
+
+        if (editingGoal) {
+            await onUpdateGoal({ ...editingGoal, ...payload });
+        } else {
+            await onAddGoal({ ...payload, currentValue: payload.currentValue || 0 });
+        }
+        
+        setIsModalOpen(false);
+    } catch (error) {
+        console.error("Erro ao salvar meta:", error);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -251,7 +261,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, onAddGoal, onDeleteGoal, onUpdateG
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg">Salvar</button>
+                <button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2">{isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Salvar'}</button>
               </div>
             </form>
           </div>

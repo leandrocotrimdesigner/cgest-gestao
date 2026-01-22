@@ -9,7 +9,9 @@ export interface Client {
   status: ClientStatus;
   monthlyValue?: number; // Only for 'mensalista'
   dueDay?: number; // Dia de vencimento (1-31)
+  driveFolderUrl?: string; // Link para pasta do Google Drive
   createdAt: string;
+  userId?: string;
 }
 
 export interface Payment {
@@ -21,6 +23,7 @@ export interface Payment {
   paidAt?: string; // Data do pagamento efetivo
   description?: string; // Ex: Mensalidade Maio/24
   receiptUrl?: string; // Link para o comprovante no Google Drive
+  userId?: string;
 }
 
 export type ProjectStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -37,6 +40,7 @@ export interface Project {
   budget: number;
   deadline?: string;
   createdAt: string;
+  userId?: string;
 }
 
 export interface Goal {
@@ -45,6 +49,7 @@ export interface Goal {
   targetValue: number;
   currentValue: number;
   deadline?: string;
+  userId?: string;
 }
 
 export interface Task {
@@ -57,6 +62,7 @@ export interface Task {
   isMeeting?: boolean; // Flag para identificar se é reunião
   meetingTime?: string; // Horário da reunião (HH:mm)
   googleEventId?: string; // ID do evento no Google Calendar para exclusão
+  userId?: string;
 }
 
 export interface User {

@@ -1,17 +1,36 @@
 
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from '../types';
-import { supabase } from './supabaseClient';
+import { db, auth, isConfigured } from './firebaseClient';
+import { 
+    collection, 
+    addDoc, 
+    getDocs, 
+    updateDoc, 
+    deleteDoc, 
+    doc, 
+    query, 
+    where 
+} from 'firebase/firestore';
+import { 
+    signInWithEmailAndPassword, 
+    signOut, 
+    updateProfile 
+} from 'firebase/auth';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
+const FALLBACK_USER_ID = '65a99752-aa5e-46c4-a7c0-18dd286e89e0';
 
 class DataService {
   private useMock: boolean;
 
   constructor() {
-    this.useMock = !supabase;
+    this.useMock = !isConfigured || !db;
     
     if (this.useMock) {
+      console.warn("DataService: Firebase não detectado, usando LocalStorage.");
       this.initLocalStore();
+    } else {
+      console.log("DataService: Conectado ao Firestore.");
     }
   }
 
@@ -23,333 +42,330 @@ class DataService {
     if (!localStorage.getItem('cgest_payments')) localStorage.setItem('cgest_payments', '[]');
   }
 
-  // --- HELPERS DE MAPEAMENTO ---
+  // --- HELPERS ---
   
-  private mapDbToClient(record: any): Client {
-      return {
-          id: record.id,
-          name: record.name,
-          type: record.contract_type || 'avulso', 
-          status: record.status || 'active',
-          monthlyValue: record.monthly_value ? Number(record.monthly_value) : undefined,
-          dueDay: record.due_day ? Number(record.due_day) : undefined,
-          createdAt: record.created_at || new Date().toISOString()
-      };
+  private getCurrentUserId(): string {
+      if (this.useMock) return FALLBACK_USER_ID;
+      return auth?.currentUser?.uid || FALLBACK_USER_ID;
   }
 
-  private mapDbToTask(record: any): Task {
-      return {
-          id: record.id,
-          title: record.description || record.title || 'Sem título',
-          isCompleted: record.completed || false,
-          projectId: record.project_id,
-          dueDate: record.due_date,
-          isMeeting: record.is_meeting || false,
-          meetingTime: record.meeting_time, 
-          createdAt: record.created_at
-      };
-  }
-
-  private mapSupabaseUser(u: any): User {
-      return {
-          id: u.id,
-          email: u.email || '',
-          name: u.user_metadata?.name || u.email?.split('@')[0] || 'Usuário',
-          avatar: u.user_metadata?.avatar_url || ''
-      };
-  }
-
-  // --- CRUD WRAPPERS ---
+  // --- CLIENTS (Firestore Collection: clients) ---
   
-  // CLIENTS
   async getClients(): Promise<Client[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
     
     try {
-        const { data, error } = await supabase!.from('clients').select('*');
-        if (error) return [];
-        return (data || []).map(this.mapDbToClient);
+        const userId = this.getCurrentUserId();
+        const q = query(collection(db, 'clients'), where("userId", "==", userId));
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as Client[];
     } catch (e) {
+        console.error("Erro getClients:", e);
         return [];
     }
   }
 
   async addClient(client: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
-    console.log('[DataService] Iniciando addClient...');
+    const userId = this.getCurrentUserId();
+    const now = new Date().toISOString();
     
     if (this.useMock) {
-      const newClient = { ...client, id: generateId(), createdAt: new Date().toISOString() };
+      const newClient = { ...client, id: generateId(), createdAt: now, userId };
+      const current = JSON.parse(localStorage.getItem('cgest_clients') || '[]');
+      localStorage.setItem('cgest_clients', JSON.stringify([...current, newClient]));
       return newClient;
     }
     
-    // Captura direta do ID do usuário para garantir a sessão atual
-    const { data: userData } = await supabase!.auth.getUser();
-    const userId = userData.user?.id;
-
-    if (!userId) {
-        console.error('[DataService] Erro: User ID não encontrado via getUser()');
-        throw new Error("Sessão expirada ou inválida. Recarregue a página.");
-    }
-
-    // Payload Limpo e Mínimo
-    const dbPayload = { 
+    // Payload Firestore Flexível - Salva o que vier
+    const payload = {
         name: client.name,
-        contract_type: client.type, // 'mensalista' ou 'avulso'
-        status: client.status,      // 'active' ou 'inactive'
-        user_id: userId,
-        // Campos opcionais apenas se existirem
-        monthly_value: client.monthlyValue || null,
-        due_day: client.dueDay || null
+        type: client.type,
+        status: client.status,
+        monthlyValue: client.monthlyValue || 0,
+        dueDay: client.dueDay || null,
+        driveFolderUrl: client.driveFolderUrl || '',
+        createdAt: now,
+        userId: userId
     };
 
-    console.log('[DataService] Payload enviado:', dbPayload);
-
     try {
-        const { data, error } = await supabase!.from('clients').insert([dbPayload]).select().single();
-        
-        console.log('[DataService] Resposta Supabase:', { data, error });
-
-        if (error) {
-            throw error;
-        }
-        
-        return this.mapDbToClient(data);
+        const docRef = await addDoc(collection(db, 'clients'), payload);
+        return { id: docRef.id, ...payload } as Client;
     } catch (error: any) {
-        console.error('[DataService] Erro Fatal addClient:', error);
-        throw new Error(error.message || "Erro ao gravar no banco.");
+        console.error("Erro addClient Firestore:", error);
+        throw new Error("Erro ao salvar no banco de dados.");
     }
   }
 
   async updateClient(client: Client): Promise<void> {
-       if(this.useMock) return;
-       const { error } = await supabase!.from('clients').update({ 
-           name: client.name,
-           contract_type: client.type,
-           status: client.status,
-           monthly_value: client.monthlyValue,
-           due_day: client.dueDay
-       }).eq('id', client.id);
+       if(this.useMock) {
+          const current = JSON.parse(localStorage.getItem('cgest_clients') || '[]');
+          const updated = current.map((c: Client) => c.id === client.id ? client : c);
+          localStorage.setItem('cgest_clients', JSON.stringify(updated));
+          return;
+       }
+       
+       await updateDoc(doc(db, 'clients', client.id), { ...client });
   }
 
   async deleteClient(id: string): Promise<void> {
-    if(this.useMock) return;
-    await supabase!.from('clients').delete().eq('id', id);
+    if(this.useMock) {
+        const current = JSON.parse(localStorage.getItem('cgest_clients') || '[]');
+        localStorage.setItem('cgest_clients', JSON.stringify(current.filter((c: Client) => c.id !== id)));
+        return;
+    }
+    await deleteDoc(doc(db, 'clients', id));
   }
 
-  // PROJECTS
+  // --- PROJECTS (Firestore Collection: projects) ---
+  
   async getProjects(): Promise<Project[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_projects') || '[]');
     try {
-        const { data, error } = await supabase!.from('projects').select('*');
-        if (error) return [];
-        return (data || []) as Project[];
+        const q = query(collection(db, 'projects'), where("userId", "==", this.getCurrentUserId()));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
     } catch { return []; }
   }
 
   async addProject(project: any): Promise<Project> {
-      try {
-        if (this.useMock) return { ...project, id: generateId() };
-        
-        const { data: userData } = await supabase!.auth.getUser();
-        const userId = userData.user?.id;
-        if(!userId) throw new Error("Login necessario");
-        
-        const payload = { 
-            name: project.name,
-            client_id: project.clientId,
-            status: project.status,
-            payment_status: project.paymentStatus,
-            budget: project.budget,
-            user_id: userId 
-        };
-        
-        const { data, error } = await supabase!.from('projects').insert([payload]).select().single();
-        if(error) throw error;
-        return data as Project;
-      } catch (e) {
-          return { ...project, id: generateId() } as Project;
+      const userId = this.getCurrentUserId();
+      const payload = { ...project, userId, createdAt: new Date().toISOString() };
+      
+      if (this.useMock) {
+         const newP = { ...payload, id: generateId() };
+         const list = JSON.parse(localStorage.getItem('cgest_projects') || '[]');
+         localStorage.setItem('cgest_projects', JSON.stringify([...list, newP]));
+         return newP;
       }
+      
+      const docRef = await addDoc(collection(db, 'projects'), payload);
+      return { id: docRef.id, ...payload };
   }
 
   async updateProjectStatus(id: string, status: any): Promise<void> {
-      if(!this.useMock) await supabase!.from('projects').update({ status }).eq('id', id);
+      if(!this.useMock) await updateDoc(doc(db, 'projects', id), { status });
+      else {
+          const list = JSON.parse(localStorage.getItem('cgest_projects') || '[]');
+          const updated = list.map((p: Project) => p.id === id ? { ...p, status } : p);
+          localStorage.setItem('cgest_projects', JSON.stringify(updated));
+      }
   }
   
   async updateProjectPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> { 
-      if(!this.useMock) await supabase!.from('projects').update({ payment_status: paymentStatus }).eq('id', id);
+      if(!this.useMock) {
+          const updateData: any = { paymentStatus };
+          if (paymentStatus === 'paid') updateData.paidAt = new Date().toISOString().split('T')[0];
+          await updateDoc(doc(db, 'projects', id), updateData);
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_projects') || '[]');
+          const updated = list.map((p: Project) => p.id === id ? { ...p, paymentStatus } : p);
+          localStorage.setItem('cgest_projects', JSON.stringify(updated));
+      }
   }
   
   async deleteProject(id: string): Promise<void> { 
-      if(!this.useMock) await supabase!.from('projects').delete().eq('id', id);
+      if(!this.useMock) await deleteDoc(doc(db, 'projects', id));
+      else {
+          const list = JSON.parse(localStorage.getItem('cgest_projects') || '[]');
+          localStorage.setItem('cgest_projects', JSON.stringify(list.filter((p: Project) => p.id !== id)));
+      }
   }
 
-  // GOALS
+  // --- GOALS (Firestore Collection: goals) ---
+  
   async getGoals(): Promise<Goal[]> {
-      return []; 
-  }
-  async addGoal(goal: any): Promise<void> {}
-  async updateGoal(goal: Goal): Promise<void> {}
-  async deleteGoal(id: string): Promise<void> {}
-
-  // TASKS
-  async getTasks(): Promise<Task[]> {
+      if (this.useMock) return JSON.parse(localStorage.getItem('cgest_goals') || '[]');
       try {
-        if (this.useMock) return [];
-        const { data, error } = await supabase!.from('tasks').select('*');
-        if (error) return [];
-        return (data || []).map(this.mapDbToTask);
+        const q = query(collection(db, 'goals'), where("userId", "==", this.getCurrentUserId()));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Goal[];
+      } catch { return []; }
+  }
+  
+  async addGoal(goal: any): Promise<void> {
+      const payload = { ...goal, userId: this.getCurrentUserId() };
+      if (!this.useMock) {
+          await addDoc(collection(db, 'goals'), payload);
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_goals') || '[]');
+          localStorage.setItem('cgest_goals', JSON.stringify([...list, { ...payload, id: generateId() }]));
+      }
+  }
+  
+  async updateGoal(goal: Goal): Promise<void> {
+      if (!this.useMock) {
+          await updateDoc(doc(db, 'goals', goal.id), { ...goal });
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_goals') || '[]');
+          const updated = list.map((g: Goal) => g.id === goal.id ? goal : g);
+          localStorage.setItem('cgest_goals', JSON.stringify(updated));
+      }
+  }
+  
+  async deleteGoal(id: string): Promise<void> {
+      if (!this.useMock) await deleteDoc(doc(db, 'goals', id));
+      else {
+          const list = JSON.parse(localStorage.getItem('cgest_goals') || '[]');
+          localStorage.setItem('cgest_goals', JSON.stringify(list.filter((g: Goal) => g.id !== id)));
+      }
+  }
+
+  // --- TASKS (Firestore Collection: tasks) ---
+  
+  async getTasks(): Promise<Task[]> {
+      if (this.useMock) return JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
+      try {
+        const q = query(collection(db, 'tasks'), where("userId", "==", this.getCurrentUserId()));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
       } catch { return []; }
   }
   
   async addTask(task: any): Promise<void> {
-    console.log('[DataService] Iniciando addTask...');
+    console.log('[DataService] Iniciando addTask (Firebase)...');
 
-    if (this.useMock) return;
+    const userId = this.getCurrentUserId();
+    // Garante que não haja formatação estranha, salva como vem
+    const payload = { ...task, userId, createdAt: new Date().toISOString() };
+
+    if (this.useMock) {
+        const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
+        localStorage.setItem('cgest_tasks', JSON.stringify([...list, { ...payload, id: generateId() }]));
+        return;
+    }
     
     try {
-        // Captura direta do ID do usuário
-        const { data: userData } = await supabase!.auth.getUser();
-        const userId = userData.user?.id;
-
-        if(!userId) {
-            console.error('[DataService] Erro: User ID não encontrado em addTask');
-            throw new Error("Login necessário para criar tarefas.");
-        }
-        
-        const dbPayload = {
-            description: task.title,
-            due_date: task.dueDate,
-            completed: task.isCompleted || false,
-            is_meeting: task.isMeeting || false,
-            meeting_time: task.meetingTime,
-            project_id: task.projectId || null,
-            user_id: userId
-        };
-
-        console.log('[DataService] Payload Task:', dbPayload);
-        
-        const { data, error } = await supabase!.from('tasks').insert([dbPayload]).select();
-        
-        console.log('[DataService] Resposta Task:', { data, error });
-
-        if (error) throw error;
+        await addDoc(collection(db, 'tasks'), payload);
     } catch(e: any) {
-        console.error("[DataService] Erro addTask:", e);
+        console.error("[DataService] Erro addTask Firestore:", e);
         throw new Error(`Erro ao salvar tarefa: ${e.message}`);
     }
   }
   
   async toggleTask(id: string, isCompleted: boolean): Promise<void> {
       if (!this.useMock) {
-          await supabase!.from('tasks').update({ completed: isCompleted }).eq('id', id);
+          await updateDoc(doc(db, 'tasks', id), { isCompleted });
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
+          const updated = list.map((t: Task) => t.id === id ? { ...t, isCompleted } : t);
+          localStorage.setItem('cgest_tasks', JSON.stringify(updated));
       }
   }
   
   async deleteTask(id: string): Promise<void> {
       if (!this.useMock) {
-          await supabase!.from('tasks').delete().eq('id', id);
+          await deleteDoc(doc(db, 'tasks', id));
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
+          localStorage.setItem('cgest_tasks', JSON.stringify(list.filter((t: Task) => t.id !== id)));
       }
   }
 
-  // PAYMENTS
+  // --- PAYMENTS (Firestore Collection: payments) ---
+  
   async getPayments(): Promise<Payment[]> {
+      if (this.useMock) return JSON.parse(localStorage.getItem('cgest_payments') || '[]');
       try {
-        if (this.useMock) return [];
-        const { data, error } = await supabase!.from('payments').select('*');
-        if (error) return [];
-        return (data || []) as Payment[];
+        const q = query(collection(db, 'payments'), where("userId", "==", this.getCurrentUserId()));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Payment[];
       } catch { return []; }
   }
   
   async addPayment(payment: any): Promise<void> {
+      const payload = { ...payment, userId: this.getCurrentUserId() };
       if(!this.useMock) {
-          const { data: userData } = await supabase!.auth.getUser();
-          const userId = userData.user?.id;
-          if (!userId) return;
-          const payload = { ...payment, user_id: userId };
-          await supabase!.from('payments').insert([payload]);
+          await addDoc(collection(db, 'payments'), payload);
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_payments') || '[]');
+          localStorage.setItem('cgest_payments', JSON.stringify([...list, { ...payload, id: generateId() }]));
       }
   }
   
   async updatePayment(payment: Payment): Promise<void> {
       if(!this.useMock) {
-         await supabase!.from('payments').update({ 
-             status: payment.status, 
-             value: payment.value,
-             description: payment.description,
-             paid_at: payment.paidAt,
-             receipt_url: payment.receiptUrl
-         }).eq('id', payment.id);
+         await updateDoc(doc(db, 'payments', payment.id), { ...payment });
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_payments') || '[]');
+          const updated = list.map((p: Payment) => p.id === payment.id ? payment : p);
+          localStorage.setItem('cgest_payments', JSON.stringify(updated));
       }
   }
 
-  // --- AUTH ---
+  // --- AUTH (Firebase Auth) ---
+  
   async login(email: string, pass: string): Promise<User> {
-      const { data, error } = await supabase!.auth.signInWithPassword({
-          email,
-          password: pass
-      });
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Usuário não encontrado.");
-      return this.mapSupabaseUser(data.user);
+      if (this.useMock) {
+          return { id: FALLBACK_USER_ID, email, name: 'Usuário Local' };
+      }
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const u = userCredential.user;
+      return { id: u.uid, email: u.email || '', name: u.displayName || 'Usuário', avatar: u.photoURL || '' };
   }
 
   async logout(): Promise<void> {
       if (this.useMock) return;
-      await supabase!.auth.signOut();
+      await signOut(auth);
   }
 
   async getCurrentUser(): Promise<User | null> {
-      if (this.useMock) return null;
-      const { data: { session } } = await supabase!.auth.getSession();
-      if (session?.user) return this.mapSupabaseUser(session.user);
-      return null;
+      if (this.useMock) return { id: FALLBACK_USER_ID, email: 'admin@local.com', name: 'Admin Local' };
+      
+      return new Promise((resolve) => {
+          if (!auth) { resolve(null); return; }
+          const unsubscribe = auth.onAuthStateChanged((u: any) => {
+              if (u) {
+                  resolve({ id: u.uid, email: u.email || '', name: u.displayName || 'Usuário', avatar: u.photoURL || '' });
+              } else {
+                  resolve(null);
+              }
+              unsubscribe();
+          });
+      });
   }
 
   async updateUser(user: User): Promise<User> {
-      const updates: any = { data: { name: user.name, avatar_url: user.avatar } };
-      const { data, error } = await supabase!.auth.updateUser(updates);
-      if (error) throw error;
-      return this.mapSupabaseUser(data.user);
+      if (!this.useMock && auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: user.name, photoURL: user.avatar });
+          return user;
+      }
+      return user;
   }
 
   // --- BACKUP & RESTORE ---
   
   async getBackupData(): Promise<any> {
-    if (this.useMock) return {}; // Mock implementation skipped for brevity
-
-    const { data: clients } = await supabase!.from('clients').select('*');
-    const { data: projects } = await supabase!.from('projects').select('*');
-    const { data: tasks } = await supabase!.from('tasks').select('*');
-    const { data: payments } = await supabase!.from('payments').select('*');
+    const clients = await this.getClients();
+    const projects = await this.getProjects();
+    const tasks = await this.getTasks();
+    const payments = await this.getPayments();
+    const goals = await this.getGoals();
 
     return {
-        clients: clients || [],
-        projects: projects || [],
-        tasks: tasks || [],
-        payments: payments || [],
+        clients,
+        projects,
+        tasks,
+        payments,
+        goals,
         timestamp: new Date().toISOString()
     };
   }
 
   async restoreBackupData(backup: any): Promise<void> {
-    if (this.useMock) return;
-
-    const { data: userData } = await supabase!.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) throw new Error("Usuário não autenticado.");
-
-    await supabase!.from('payments').delete().eq('user_id', userId);
-    await supabase!.from('tasks').delete().eq('user_id', userId);
-    await supabase!.from('projects').delete().eq('user_id', userId);
-    await supabase!.from('clients').delete().eq('user_id', userId);
-
-    const injectUser = (arr: any[]) => arr.map(item => ({ ...item, user_id: userId }));
-
-    if (backup.clients?.length) await supabase!.from('clients').insert(injectUser(backup.clients));
-    if (backup.projects?.length) await supabase!.from('projects').insert(injectUser(backup.projects));
-    if (backup.tasks?.length) await supabase!.from('tasks').insert(injectUser(backup.tasks));
-    if (backup.payments?.length) await supabase!.from('payments').insert(injectUser(backup.payments));
+    if (!this.useMock) {
+        console.warn("Restauração não disponível diretamente no Firebase por segurança.");
+        return;
+    }
+    
+    if (backup.clients) localStorage.setItem('cgest_clients', JSON.stringify(backup.clients));
+    if (backup.projects) localStorage.setItem('cgest_projects', JSON.stringify(backup.projects));
+    if (backup.tasks) localStorage.setItem('cgest_tasks', JSON.stringify(backup.tasks));
+    if (backup.payments) localStorage.setItem('cgest_payments', JSON.stringify(backup.payments));
   }
 }
 

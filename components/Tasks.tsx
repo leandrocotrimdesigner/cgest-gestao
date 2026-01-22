@@ -120,7 +120,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         console.error("Erro ao adicionar tarefa:", error);
         alert("Erro ao salvar. Verifique o console.");
     } finally {
-        // GARANTIA DE DESTRAVAMENTO
+        // GARANTIA DE DESBLOQUEIO DO BOTÃO
         setIsSubmitting(false); 
     }
   };
