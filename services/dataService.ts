@@ -46,7 +46,12 @@ class DataService {
   
   private getCurrentUserId(): string {
       if (this.useMock) return FALLBACK_USER_ID;
-      return auth?.currentUser?.uid || FALLBACK_USER_ID;
+      
+      const uid = auth?.currentUser?.uid;
+      if (!uid) {
+          throw new Error("Usuário não autenticado. Operação abortada por segurança.");
+      }
+      return uid;
   }
 
   // --- CLIENTS (Firestore Collection: clients) ---
@@ -73,13 +78,6 @@ class DataService {
     const userId = this.getCurrentUserId();
     const now = new Date().toISOString();
     
-    if (this.useMock) {
-      const newClient = { ...client, id: generateId(), createdAt: now, userId };
-      const current = JSON.parse(localStorage.getItem('cgest_clients') || '[]');
-      localStorage.setItem('cgest_clients', JSON.stringify([...current, newClient]));
-      return newClient;
-    }
-    
     const payload = {
         name: client.name,
         type: client.type,
@@ -88,15 +86,22 @@ class DataService {
         dueDay: client.dueDay || null,
         driveFolderUrl: client.driveFolderUrl || '',
         createdAt: now,
-        userId: userId
+        userId: userId // VÍNCULO OBRIGATÓRIO
     };
+
+    if (this.useMock) {
+      const newClient = { ...payload, id: generateId() };
+      const current = JSON.parse(localStorage.getItem('cgest_clients') || '[]');
+      localStorage.setItem('cgest_clients', JSON.stringify([...current, newClient]));
+      return newClient;
+    }
 
     try {
         const docRef = await addDoc(collection(db, 'clients'), payload);
         return { id: docRef.id, ...payload } as Client;
     } catch (error: any) {
         console.error("Erro addClient Firestore:", error);
-        throw new Error("Erro ao salvar no banco de dados.");
+        throw error;
     }
   }
 
@@ -108,6 +113,7 @@ class DataService {
           return;
        }
        
+       // Não precisamos reenviar o userId no update se as regras permitirem isOwner
        await updateDoc(doc(db, 'clients', client.id), { ...client });
   }
 
@@ -133,7 +139,11 @@ class DataService {
 
   async addProject(project: any): Promise<Project> {
       const userId = this.getCurrentUserId();
-      const payload = { ...project, userId, createdAt: new Date().toISOString() };
+      const payload = { 
+          ...project, 
+          userId, 
+          createdAt: new Date().toISOString() 
+      };
       
       if (this.useMock) {
          const newP = { ...payload, id: generateId() };
@@ -187,7 +197,9 @@ class DataService {
   }
   
   async addGoal(goal: any): Promise<void> {
-      const payload = { ...goal, userId: this.getCurrentUserId() };
+      const userId = this.getCurrentUserId();
+      const payload = { ...goal, userId };
+      
       if (!this.useMock) {
           await addDoc(collection(db, 'goals'), payload);
       } else {
@@ -226,10 +238,12 @@ class DataService {
   }
   
   async addTask(task: any): Promise<void> {
-    console.log('[DataService] Iniciando addTask (Firebase)...');
-
     const userId = this.getCurrentUserId();
-    const payload = { ...task, userId, createdAt: new Date().toISOString() };
+    const payload = { 
+        ...task, 
+        userId, 
+        createdAt: new Date().toISOString() 
+    };
 
     if (this.useMock) {
         const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
@@ -276,7 +290,9 @@ class DataService {
   }
   
   async addPayment(payment: any): Promise<void> {
-      const payload = { ...payment, userId: this.getCurrentUserId() };
+      const userId = this.getCurrentUserId();
+      const payload = { ...payment, userId };
+      
       if(!this.useMock) {
           await addDoc(collection(db, 'payments'), payload);
       } else {
@@ -339,7 +355,6 @@ class DataService {
 
   async updateUser(user: User): Promise<User> {
       if (!this.useMock && auth.currentUser) {
-          // Nota: Google Auth geralmente gerencia a foto, mas permitimos override se necessário
           await updateProfile(auth.currentUser, { displayName: user.name, photoURL: user.avatar });
           return user;
       }
