@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Client, Payment } from '../types';
-import { Plus, Trash2, Search, DollarSign, CheckCircle, AlertCircle, Edit2, Loader2, FolderOpen, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, CheckCircle, AlertCircle, Edit2, Loader2, FolderOpen, ExternalLink, Cloud } from 'lucide-react';
 import { googleDriveService } from '../services/googleDriveService';
 import { useToast } from './ToastContext';
 import { BaseModal } from './BaseModal';
@@ -120,7 +120,6 @@ const Clients: React.FC<ClientsProps> = ({
         console.error("Erro no submit do cliente:", e);
         addToast({ type: 'error', title: 'Erro ao salvar', message: 'Tente novamente.' });
     } finally {
-        // GARANTIA DE DESBLOQUEIO DO BOTÃO
         setIsSubmitting(false);
     }
   };
@@ -275,7 +274,7 @@ const Clients: React.FC<ClientsProps> = ({
                 <th className="px-6 py-3 font-semibold">Nome</th>
                 <th className="px-6 py-3 font-semibold">Tipo</th>
                 <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 font-semibold">Drive</th>
+                <th className="px-6 py-3 font-semibold">Drive (2TB)</th>
                 <th className="px-6 py-3 font-semibold">Situação</th>
                 <th className="px-6 py-3 font-semibold text-right">Ações</th>
               </tr>
@@ -291,9 +290,9 @@ const Clients: React.FC<ClientsProps> = ({
                         <td className="px-6 py-4">
                             {client.driveFolderUrl ? (
                                 <a href={client.driveFolderUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline hover:text-blue-700 flex items-center gap-1.5 font-medium text-sm transition-colors">
-                                    <FolderOpen size={16} className="shrink-0" /> Abrir Pasta <ExternalLink size={12} />
+                                    <Cloud size={16} className="shrink-0 text-blue-500" /> Acessar Arquivos <ExternalLink size={12} />
                                 </a>
-                            ) : <span className="text-slate-400 text-xs italic">Sem link</span>}
+                            ) : <span className="text-slate-400 text-xs italic">Sem pasta</span>}
                         </td>
                         <td className="px-6 py-4">{client.status === 'active' ? (<div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${finStatus === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{finStatus === 'overdue' ? <AlertCircle size={14}/> : <CheckCircle size={14}/>}{finStatus === 'overdue' ? 'EM ATRASO' : 'EM DIA'}</div>) : '-'}</td>
                         <td className="px-6 py-4 text-right"><div className="flex items-center justify-end gap-2"><button onClick={(e) => handleOpenFinancial(e, client)} className="text-blue-600 bg-blue-50 p-1.5 rounded-md"><DollarSign size={18} /></button><button onClick={(e) => handleOpenEditClient(e, client)} className="text-slate-500 hover:text-blue-600 p-1.5"><Edit2 size={18} /></button><button onClick={(e) => handleDeleteClientRequest(e, client)} className="text-slate-400 hover:text-red-600 p-1.5"><Trash2 size={18} /></button></div></td>
@@ -331,12 +330,12 @@ const Clients: React.FC<ClientsProps> = ({
                 </label>
                 <input 
                     type="url" 
-                    placeholder="https://drive.google.com/drive/folders/..." 
+                    placeholder="https://drive.google.com/drive/u/0/folders/..." 
                     value={clientFormData.driveFolderUrl || ''} 
                     onChange={e => setClientFormData({...clientFormData, driveFolderUrl: e.target.value})} 
                     className={inputClass} 
                 />
-                <p className="text-xs text-slate-400 mt-1">Cole o link da pasta do cliente para salvar os arquivos de 2TB.</p>
+                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Cloud size={10} /> Link para armazenamento de arquivos pesados (2TB)</p>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
