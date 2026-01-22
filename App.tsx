@@ -109,10 +109,10 @@ function App() {
     }
   }, [user]);
 
-  const handleLogin = async (email: string, pass: string) => {
+  const handleLogin = async () => {
     setIsLoading(true);
     try {
-        const user = await dataService.login(email, pass);
+        const user = await dataService.loginWithGoogle();
         setUser(user);
     } catch (e) {
         throw e; 
@@ -156,7 +156,7 @@ function App() {
       return (
           <div className="flex h-screen items-center justify-center bg-slate-50 flex-col gap-4">
              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-             <p className="text-slate-500 font-medium animate-pulse">Iniciando CGest...</p>
+             <p className="text-slate-500 font-medium animate-pulse">Carregando CGest...</p>
           </div>
       );
   }

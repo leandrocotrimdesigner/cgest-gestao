@@ -1,35 +1,28 @@
 
 import React, { useState } from 'react';
-import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, CheckCircle } from 'lucide-react';
 
 interface LoginProps {
-  onLogin: (email: string, pass: string) => Promise<void>;
+  onLogin: () => Promise<void>;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError('');
     try {
-      await onLogin(email, password);
+      await onLogin();
     } catch (err: any) {
-      // Mensagens de erro amigáveis
-      let msg = 'Falha no login. Verifique suas credenciais.';
-      if (err.message && err.message.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
-      if (err.message && err.message.includes('Email not confirmed')) msg = 'Verifique seu e-mail para confirmar a conta.';
+      console.error(err);
+      let msg = 'Não foi possível conectar com o Google.';
+      if (err.code === 'auth/popup-closed-by-user') msg = 'Login cancelado.';
       setError(msg);
-    } finally {
       setIsLoading(false);
     }
   };
-
-  const inputClass = "w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 text-slate-900 placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all block opacity-100";
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -42,60 +35,54 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 alt="CGest" 
                 className="h-24 w-auto object-contain mb-4"
             />
-            <p className="text-slate-500 text-sm">Acesso Administrativo</p>
+            <h2 className="text-2xl font-bold text-slate-800">Bem-vindo de volta</h2>
+            <p className="text-slate-500 text-sm mt-1">Gestão inteligente e segura</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center gap-2">
+            <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center gap-2">
               <ShieldCheck size={16} />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className={inputClass}
-                  placeholder="seu@email.com"
-                  autoComplete="email"
-                />
+          <div className="space-y-6">
+            <button 
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="w-full bg-white text-slate-700 font-bold py-3 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed group"
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin text-blue-600" size={24} />
+              ) : (
+                <>
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+                  <span className="group-hover:text-slate-900 transition-colors">Entrar com Google</span>
+                </>
+              )}
+            </button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
               </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-slate-400">Acesso Seguro</span>
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
-            >
-              {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Entrar'}
-            </button>
-          </form>
+            <div className="text-center space-y-2">
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                    <CheckCircle size={12} className="text-green-500" /> Seus dados estão protegidos
+                </div>
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                    <CheckCircle size={12} className="text-green-500" /> Integração Drive & Agenda
+                </div>
+            </div>
+          </div>
         </div>
         <div className="bg-slate-50 p-4 border-t border-slate-100 text-center text-xs text-slate-400">
-          &copy; 2026 CGest System. Todos os direitos reservados.
+          &copy; 2026 CGest System. Desenvolvido com Google Cloud.
         </div>
       </div>
     </div>

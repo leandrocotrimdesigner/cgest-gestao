@@ -1,7 +1,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 // --- CONFIGURAÇÃO OFICIAL DO FIREBASE (PRODUÇÃO) ---
 const firebaseConfig = {
@@ -17,12 +17,19 @@ const firebaseConfig = {
 let app;
 let db: any;
 let auth: any;
+let googleProvider: GoogleAuthProvider;
 let isConfigured = false;
 
 try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+    // Força a seleção de conta para evitar login automático indesejado em sessões compartilhadas
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
     isConfigured = true;
     console.log("Firebase (cgest-e9b48) iniciado com sucesso.");
 } catch (e) {
@@ -30,4 +37,4 @@ try {
     isConfigured = false;
 }
 
-export { db, auth, isConfigured };
+export { db, auth, googleProvider, isConfigured };

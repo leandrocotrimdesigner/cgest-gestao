@@ -1,6 +1,6 @@
 
 import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from '../types';
-import { db, auth, isConfigured } from './firebaseClient';
+import { db, auth, googleProvider, isConfigured } from './firebaseClient';
 import { 
     collection, 
     addDoc, 
@@ -12,7 +12,7 @@ import {
     where 
 } from 'firebase/firestore';
 import { 
-    signInWithEmailAndPassword, 
+    signInWithPopup, 
     signOut, 
     updateProfile 
 } from 'firebase/auth';
@@ -80,7 +80,6 @@ class DataService {
       return newClient;
     }
     
-    // Payload Firestore Flexível - Salva o que vier
     const payload = {
         name: client.name,
         type: client.type,
@@ -230,7 +229,6 @@ class DataService {
     console.log('[DataService] Iniciando addTask (Firebase)...');
 
     const userId = this.getCurrentUserId();
-    // Garante que não haja formatação estranha, salva como vem
     const payload = { ...task, userId, createdAt: new Date().toISOString() };
 
     if (this.useMock) {
@@ -297,15 +295,25 @@ class DataService {
       }
   }
 
-  // --- AUTH (Firebase Auth) ---
+  // --- AUTH (Google Only) ---
   
-  async login(email: string, pass: string): Promise<User> {
+  async loginWithGoogle(): Promise<User> {
       if (this.useMock) {
-          return { id: FALLBACK_USER_ID, email, name: 'Usuário Local' };
+          return { id: FALLBACK_USER_ID, email: 'mock@cgest.com', name: 'Usuário Local' };
       }
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      const u = userCredential.user;
-      return { id: u.uid, email: u.email || '', name: u.displayName || 'Usuário', avatar: u.photoURL || '' };
+      try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const u = result.user;
+          return { 
+              id: u.uid, 
+              email: u.email || '', 
+              name: u.displayName || 'Usuário', 
+              avatar: u.photoURL || '' 
+          };
+      } catch (error: any) {
+          console.error("Erro no login Google:", error);
+          throw error;
+      }
   }
 
   async logout(): Promise<void> {
@@ -331,6 +339,7 @@ class DataService {
 
   async updateUser(user: User): Promise<User> {
       if (!this.useMock && auth.currentUser) {
+          // Nota: Google Auth geralmente gerencia a foto, mas permitimos override se necessário
           await updateProfile(auth.currentUser, { displayName: user.name, photoURL: user.avatar });
           return user;
       }
