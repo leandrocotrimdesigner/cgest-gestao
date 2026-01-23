@@ -3,15 +3,16 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
-// --- CONFIGURAÇÃO OFICIAL DO FIREBASE (PRODUÇÃO) ---
-// ATENÇÃO: Verifique se a apiKey, messagingSenderId e appId correspondem ao novo projeto cgest-11430 no console.
+// --- CONFIGURAÇÃO DO FIREBASE (PROJETO: cgest-11430) ---
+// IMPORTANTE: Substitua os valores abaixo pelos encontrados no Firebase Console:
+// Project Settings > General > Your apps > SDK setup and configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDbX-xYJQMiUraCp252GsjwfxGyxQ8PrJc", // <--- SUBSTITUA PELA API KEY DO NOVO PROJETO SE FOR DIFERENTE
+  apiKey: "COLE_SUA_API_KEY_AQUI", // <--- OBRIGATÓRIO: Copie do Firebase Console
   authDomain: "cgest-11430.firebaseapp.com",
   projectId: "cgest-11430",
   storageBucket: "cgest-11430.firebasestorage.app",
-  messagingSenderId: "399870636201", // <--- VERIFIQUE NO CONSOLE DO NOVO PROJETO
-  appId: "1:399870636201:web:5b3a94b1929fe46e9739b8", // <--- VERIFIQUE NO CONSOLE DO NOVO PROJETO
+  messagingSenderId: "399870636201", // Verifique se este ID mudou no novo projeto
+  appId: "COLE_SEU_APP_ID_AQUI",    // <--- OBRIGATÓRIO: Copie do Firebase Console
   measurementId: "G-TETJFXZJ90"
 };
 
@@ -21,13 +22,23 @@ let auth: any;
 let googleProvider: GoogleAuthProvider;
 let isConfigured = false;
 
+// Verificação de segurança para evitar erro silencioso de chave inválida
+const isKeyConfigured = firebaseConfig.apiKey && 
+                        !firebaseConfig.apiKey.includes("COLE_SUA_API_KEY") &&
+                        !firebaseConfig.apiKey.includes("AIzaSyDbX-xYJQMiUraCp252GsjwfxGyxQ8PrJc"); // Chave antiga inválida
+
 try {
+    if (!isKeyConfigured) {
+        console.error("CRÍTICO: A API Key do Firebase não foi configurada. Edite services/firebaseClient.ts");
+        throw new Error("Firebase API Key não configurada.");
+    }
+
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
     
-    // Força a seleção de conta. Isso ajuda a "desengasgar" sessões presas.
+    // Força a seleção de conta para evitar loop de redirecionamento ou popup fechando
     googleProvider.setCustomParameters({
       prompt: 'select_account'
     });
@@ -35,7 +46,7 @@ try {
     isConfigured = true;
     console.log("Firebase (cgest-11430) iniciado com sucesso.");
 } catch (e) {
-    console.error("Erro crítico ao iniciar Firebase:", e);
+    console.error("Erro ao iniciar Firebase:", e);
     isConfigured = false;
 }
 
