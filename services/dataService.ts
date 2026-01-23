@@ -318,6 +318,7 @@ class DataService {
           return { id: FALLBACK_USER_ID, email: 'mock@cgest.com', name: 'Usuário Local' };
       }
       try {
+          console.log("Iniciando signInWithPopup para:", window.location.hostname);
           const result = await signInWithPopup(auth, googleProvider);
           const u = result.user;
           return { 
@@ -328,6 +329,10 @@ class DataService {
           };
       } catch (error: any) {
           console.error("Erro no login Google:", error);
+          if (error.code === 'auth/unauthorized-domain') {
+              console.error("DOMÍNIO NÃO AUTORIZADO! Adicione este domínio no Firebase Console -> Auth -> Settings.");
+              alert("Domínio não autorizado. Verifique o console do navegador para mais detalhes.");
+          }
           throw error;
       }
   }
