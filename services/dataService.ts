@@ -238,14 +238,20 @@ class DataService {
   }
   
   async addTask(task: any): Promise<void> {
-    const userId = this.getCurrentUserId();
-    const payload = { 
-        ...task, 
-        userId, 
-        createdAt: new Date().toISOString() 
-    };
+  const userId = this.getCurrentUserId(); 
+  const payload = {
+    ...task,
+    projectId: task.projectId || 'geral',
+    meetingTime: task.meetingTime || new Date().toISOString(),
+    googleEventId: task.googleEventId || '',
+    userId,
+    createdAt: new Date().toISOString()
+  };
 
-    if (this.useMock) {
+  // ... o resto do código continua igual
+
+  if (this.useMock) {
+    // ... o resto do código do mock continua igual aqui embaixo
         const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
         localStorage.setItem('cgest_tasks', JSON.stringify([...list, { ...payload, id: generateId() }]));
         return;

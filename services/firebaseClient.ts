@@ -7,13 +7,13 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // IMPORTANTE: Substitua os valores abaixo pelos encontrados no Firebase Console:
 // Project Settings > General > Your apps > SDK setup and configuration
 const firebaseConfig = {
-  apiKey: "COLE_SUA_API_KEY_AQUI", // <--- OBRIGATÓRIO: Copie do Firebase Console
+  apiKey: "AIzaSyB_9TBgaAYIIQL645i0dOT5PdHpvJlIy0g", // <--- OBRIGATÓRIO: Copie do Firebase Console
   authDomain: "cgest-11430.firebaseapp.com",
   projectId: "cgest-11430",
   storageBucket: "cgest-11430.firebasestorage.app",
-  messagingSenderId: "399870636201", // Verifique se este ID mudou no novo projeto
-  appId: "COLE_SEU_APP_ID_AQUI",    // <--- OBRIGATÓRIO: Copie do Firebase Console
-  measurementId: "G-TETJFXZJ90"
+  messagingSenderId: "317063617243", // Verifique se este ID mudou no novo projeto
+  appId: "1:317063617243:web:fc9dba1cb44df913a54afe",    // <--- OBRIGATÓRIO: Copie do Firebase Console
+  measurementId: "G-3EDGJ22HM5"
 };
 
 let app;
