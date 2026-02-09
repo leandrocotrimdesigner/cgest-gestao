@@ -9,9 +9,9 @@ import Goals from './components/Goals';
 import Tasks from './components/Tasks';
 import Login from './components/Login';
 import Profile from './components/Profile'; 
-import Agenda from './components/Agenda';
+import Prospects from './components/Prospects';
 import { dataService } from './services/dataService';
-import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from './types';
+import { Client, Project, User, Goal, Task, Payment, PaymentStatus, Prospect } from './types';
 import { ToastProvider } from './components/ToastContext';
 import { auth } from './services/firebaseClient';
 
@@ -21,27 +21,22 @@ function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Data State
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [prospects, setProspects] = useState<Prospect[]>([]);
 
   useEffect(() => {
     let mounted = true;
-
-    // Timeout de segurança
     const safetyTimeout = setTimeout(() => {
         if (mounted && isLoading) {
-            console.warn("Timeout de carregamento. Liberando interface.");
             setIsLoading(false);
         }
     }, 4000);
 
-    // Firebase Auth Listener
     let unsubscribe = () => {};
-    
     if (auth) {
         unsubscribe = auth.onAuthStateChanged(async (u: any) => {
             if (!mounted) return;
@@ -53,14 +48,12 @@ function App() {
                     avatar: u.photoURL || '' 
                 });
             } else {
-                // Se não houver usuário logado no Firebase, verificamos se estamos em modo Mock
                 const currentUser = await dataService.getCurrentUser();
                 setUser(currentUser);
             }
             setIsLoading(false);
         });
     } else {
-        // Fallback para modo Mock imediato
         dataService.getCurrentUser().then(u => {
             if(mounted) setUser(u);
             setIsLoading(false);
@@ -82,31 +75,26 @@ function App() {
         dataService.getProjects(),
         dataService.getTasks(),
         dataService.getPayments(),
-        dataService.getGoals()
+        dataService.getGoals(),
+        dataService.getProspects()
       ]);
-
       const getData = <T,>(result: PromiseSettledResult<T[]>) => {
-        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-            return result.value;
-        }
+        if (result.status === 'fulfilled' && Array.isArray(result.value)) return result.value;
         return [];
       };
-
       setClients(getData(results[0]));
       setProjects(getData(results[1]));
       setTasks(getData(results[2]));
       setPayments(getData(results[3]));
       setGoals(getData(results[4]));
-
+      setProspects(getData(results[5]));
     } catch (error) {
       console.error("Erro geral no fetch data", error);
     }
   };
 
   useEffect(() => {
-    if (user) {
-      fetchData();
-    }
+    if (user) fetchData();
   }, [user]);
 
   const handleLogin = async () => {
@@ -131,7 +119,6 @@ function App() {
       setUser(savedUser);
   };
 
-  // Handlers
   const handleAddClient = async (clientData: any) => { await dataService.addClient(clientData); fetchData(); };
   const handleUpdateClient = async (clientData: Client) => { await dataService.updateClient(clientData); fetchData(); };
   const handleDeleteClient = async (id: string) => { await dataService.deleteClient(id); fetchData(); };
@@ -151,6 +138,10 @@ function App() {
   
   const handleAddPayment = async (paymentData: any) => { await dataService.addPayment(paymentData); fetchData(); };
   const handleUpdatePayment = async (payment: Payment) => { await dataService.updatePayment(payment); fetchData(); };
+
+  const handleAddProspect = async (p: any) => { await dataService.addProspect(p); fetchData(); };
+  const handleUpdateProspect = async (p: Prospect) => { await dataService.updateProspect(p); fetchData(); };
+  const handleDeleteProspect = async (id: string) => { await dataService.deleteProspect(id); fetchData(); };
 
   if (isLoading) {
       return (
@@ -172,85 +163,23 @@ function App() {
   return (
     <ToastProvider>
       <div className="flex min-h-screen bg-slate-50 text-slate-900">
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          user={user} 
-          onLogout={handleLogout}
-          isMobileOpen={isMobileOpen}
-          setIsMobileOpen={setIsMobileOpen}
-        />
-
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
         <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
           <header className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden sticky top-0 z-10">
             <div className="flex items-center gap-3">
-               <button onClick={() => setIsMobileOpen(true)} className="text-slate-600 hover:text-slate-900">
-                 <Menu size={24} />
-               </button>
+               <button onClick={() => setIsMobileOpen(true)} className="text-slate-600 hover:text-slate-900"><Menu size={24} /></button>
                <h1 className="font-bold text-lg text-slate-800">CGest</h1>
             </div>
           </header>
-
           <main className="flex-1 p-4 md:p-8 overflow-y-auto h-full">
             <div className="max-w-7xl mx-auto">
-              {activeTab === 'dashboard' && (
-                  <Dashboard 
-                      clients={clients} 
-                      projects={projects} 
-                      goals={goals} 
-                      tasks={tasks}
-                      payments={payments}
-                      onAddTask={handleAddTask}
-                      onToggleTask={handleToggleTask}
-                      onAddGoal={handleAddGoal}
-                      onDeleteGoal={handleDeleteGoal}
-                      onUpdateGoal={handleUpdateGoal}
-                  />
-              )}
-              {activeTab === 'clients' && (
-                <Clients 
-                  clients={clients} 
-                  payments={payments}
-                  onAddClient={handleAddClient} 
-                  onUpdateClient={handleUpdateClient}
-                  onDeleteClient={handleDeleteClient}
-                  onAddPayment={handleAddPayment}
-                  onUpdatePayment={handleUpdatePayment}
-                />
-              )}
-              {activeTab === 'projects' && (
-                <Projects 
-                  projects={projects} 
-                  clients={clients} 
-                  onAddProject={handleAddProject} 
-                  onUpdateStatus={handleUpdateProjectStatus}
-                  onUpdatePaymentStatus={handleUpdateProjectPaymentStatus}
-                  onDeleteProject={handleDeleteProject}
-                />
-              )}
-              {activeTab === 'agenda' && (
-                <Agenda tasks={tasks} projects={projects} />
-              )}
-              {activeTab === 'goals' && (
-                <Goals 
-                  goals={goals}
-                  onAddGoal={handleAddGoal}
-                  onDeleteGoal={handleDeleteGoal}
-                  onUpdateGoal={handleUpdateGoal}
-                />
-              )}
-              {activeTab === 'tasks' && (
-                <Tasks 
-                  tasks={tasks}
-                  projects={projects}
-                  onAddTask={handleAddTask}
-                  onToggleTask={handleToggleTask}
-                  onDeleteTask={handleDeleteTask}
-                />
-              )}
-              {activeTab === 'profile' && (
-                <Profile user={user} onUpdateUser={handleUpdateUser} />
-              )}
+              {activeTab === 'dashboard' && <Dashboard clients={clients} projects={projects} goals={goals} tasks={tasks} payments={payments} onAddTask={handleAddTask} onToggleTask={handleToggleTask} onAddGoal={handleAddGoal} onDeleteGoal={handleDeleteGoal} onUpdateGoal={handleUpdateGoal} />}
+              {activeTab === 'clients' && <Clients clients={clients} payments={payments} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} onAddPayment={handleAddPayment} onUpdatePayment={handleUpdatePayment} />}
+              {activeTab === 'projects' && <Projects projects={projects} clients={clients} onAddProject={handleAddProject} onUpdateStatus={handleUpdateProjectStatus} onUpdatePaymentStatus={handleUpdateProjectPaymentStatus} onDeleteProject={handleDeleteProject} />}
+              {activeTab === 'prospects' && <Prospects prospects={prospects} onAddProspect={handleAddProspect} onUpdateProspect={handleUpdateProspect} onDeleteProspect={handleDeleteProspect} />}
+              {activeTab === 'goals' && <Goals goals={goals} onAddGoal={handleAddGoal} onDeleteGoal={handleDeleteGoal} onUpdateGoal={handleUpdateGoal} />}
+              {activeTab === 'tasks' && <Tasks tasks={tasks} projects={projects} onAddTask={handleAddTask} onToggleTask={handleToggleTask} onDeleteTask={handleDeleteTask} />}
+              {activeTab === 'profile' && <Profile user={user} onUpdateUser={handleUpdateUser} />}
             </div>
           </main>
         </div>
@@ -260,4 +189,3 @@ function App() {
 }
 
 export default App;
- 

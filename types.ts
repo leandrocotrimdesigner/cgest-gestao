@@ -61,8 +61,21 @@ export interface Task {
   createdAt: string;
   isMeeting?: boolean; // Flag para identificar se é reunião
   meetingTime?: string; // Horário da reunião (HH:mm)
-  googleEventId?: string; // ID do evento no Google Calendar para exclusão
   userId?: string;
+}
+
+export type ProspectStatus = 'pending' | 'negative' | 'closed' | 'waiting';
+
+export interface Prospect {
+  id: string;
+  title: string; // Nome do Cliente
+  socialHandle: string; // @ do Instagram
+  description: string;
+  status: ProspectStatus;
+  imageUrl?: string;
+  createdAt: string;
+  userId?: string;
+  color?: string; // Cor do Post-it (Mantido para compatibilidade, mas ignorado visualmente em favor do padrão do site)
 }
 
 export interface User {

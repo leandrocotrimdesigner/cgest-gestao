@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, Project } from '../types';
-import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2, CalendarX, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Check, AlertCircle, Calendar, Clock, Briefcase, X, Video, Undo2, Loader2 } from 'lucide-react';
 import { DateSelector } from './DateSelector';
-import { googleCalendarService } from '../services/googleCalendarService';
 
 interface TasksProps {
   tasks: Task[];
@@ -16,26 +15,14 @@ interface TasksProps {
 const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask, onDeleteTask }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  
-  // A5: Data de Hoje Automática na inicialização
   const [dueDate, setDueDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  
-  // Loading State para Feedback Visual
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Meeting State
   const [isMeeting, setIsMeeting] = useState(false);
   const [meetingTime, setMeetingTime] = useState('');
-  
-  // Undo / Deletion State
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [undoTask, setUndoTask] = useState<Task | null>(null);
   const [undoTimer, setUndoTimer] = useState<number | null>(null);
 
-  // Meeting Deletion Modal State
-  const [meetingToDelete, setMeetingToDelete] = useState<Task | null>(null);
-
-  // Limpeza automática de IDs já excluídos do backend
   useEffect(() => {
      if (deletedIds.size > 0) {
          const currentIds = new Set(tasks.map(t => t.id));
@@ -53,7 +40,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
      }
   }, [tasks]);
 
-  // Optimistic UI
   const displayedTasks = tasks.filter(t => !deletedIds.has(t.id));
 
   const getProjectName = (id?: string) => {
@@ -64,63 +50,24 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-    
     setIsSubmitting(true);
-
     try {
-        let googleEventId: string | undefined = undefined;
-
-        // 1. Integração com Google Agenda
-        if (isMeeting && dueDate && meetingTime) {
-          if (googleCalendarService.isAuthenticated()) {
-            try {
-              const startDateStr = `${dueDate}T${meetingTime}:00`;
-              const start = new Date(startDateStr);
-              const end = new Date(start.getTime() + 60 * 60 * 1000);
-
-              const projectName = getProjectName(selectedProjectId);
-              const description = projectName ? `Projeto: ${projectName}` : 'Tarefa criada via CGest';
-
-              const response = await googleCalendarService.createEvent({
-                summary: newTaskTitle,
-                description: description,
-                start: start.toISOString(),
-                end: end.toISOString()
-              });
-              
-              if (response && response.result) {
-                  googleEventId = response.result.id;
-              }
-            } catch (error) {
-              console.error("Erro ao sincronizar com Google:", error);
-              // Não bloqueia o fluxo principal
-            }
-          }
-        }
-
-        // 2. Criar a Tarefa no Sistema
         await onAddTask({
           title: newTaskTitle,
           isCompleted: false,
           projectId: selectedProjectId || undefined,
           dueDate: dueDate || undefined,
           isMeeting: isMeeting,
-          meetingTime: isMeeting ? meetingTime : undefined,
-          googleEventId: googleEventId
+          meetingTime: isMeeting ? meetingTime : undefined
         });
-        
-        // Reset form on success
         setNewTaskTitle('');
         setSelectedProjectId('');
-        setDueDate(new Date().toISOString().split('T')[0]); // Keep today as default
+        setDueDate(new Date().toISOString().split('T')[0]);
         setIsMeeting(false);
         setMeetingTime('');
-
     } catch (error) {
         console.error("Erro ao adicionar tarefa:", error);
-        alert("Erro ao salvar. Verifique o console.");
     } finally {
-        // GARANTIA DE DESBLOQUEIO DO BOTÃO
         setIsSubmitting(false); 
     }
   };
@@ -128,12 +75,7 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
   const handleTaskDeleteRequest = (e: React.MouseEvent, task: Task) => {
     e.stopPropagation();
     e.preventDefault();
-
-    if (task.isMeeting) {
-        setMeetingToDelete(task);
-    } else {
-        handleStandardDelete(task);
-    }
+    handleStandardDelete(task);
   };
 
   const handleStandardDelete = (task: Task) => {
@@ -141,37 +83,18 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         clearTimeout(undoTimer);
         onDeleteTask(undoTask.id);
     }
-
     setDeletedIds(prev => {
         const next = new Set(prev);
         next.add(task.id);
         return next;
     });
-
     setUndoTask(task);
-    
     const timer = window.setTimeout(() => {
         onDeleteTask(task.id);
         setUndoTask(null);
         setUndoTimer(null);
     }, 5000);
-
     setUndoTimer(timer);
-  };
-
-  const confirmMeetingDelete = async () => {
-      if (!meetingToDelete) return;
-
-      if (meetingToDelete.googleEventId && googleCalendarService.isAuthenticated()) {
-          try {
-              await googleCalendarService.deleteEvent(meetingToDelete.googleEventId);
-          } catch (error) {
-              console.error("Erro ao excluir do Google Calendar", error);
-          }
-      }
-
-      onDeleteTask(meetingToDelete.id);
-      setMeetingToDelete(null);
   };
 
   const handleUndo = () => {
@@ -179,7 +102,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
           clearTimeout(undoTimer);
           setUndoTimer(null);
       }
-      
       if (undoTask) {
           setDeletedIds(prev => {
               const next = new Set(prev);
@@ -235,44 +157,23 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
             <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Plus size={18} className="text-blue-600" />Nova Tarefa</h3>
             <form onSubmit={handleAddTask} className="space-y-4">
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Descrição</label><textarea required rows={3} value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg outline-none resize-none focus:ring-2 focus:ring-blue-500" placeholder="Fazer..." /></div>
-              
-              {/* DATE SELECTOR (Com data de Hoje por padrão) */}
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Prazo</label><DateSelector value={dueDate} onChange={setDueDate} /></div>
-              
               <div><label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Projeto</label><select value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} className={inputClass}><option value="">Nenhum</option>{projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}</select></div>
-              
-              {/* Meeting Toggle */}
               <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700 flex items-center gap-2"><Video size={16} className={isMeeting ? "text-blue-600" : "text-slate-400"} /> Reunião</span>
-                      <button 
-                        type="button" 
-                        onClick={() => setIsMeeting(!isMeeting)} 
-                        className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${isMeeting ? 'bg-blue-600' : 'bg-slate-200'}`}
-                      >
+                      <button type="button" onClick={() => setIsMeeting(!isMeeting)} className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${isMeeting ? 'bg-blue-600' : 'bg-slate-200'}`}>
                           <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${isMeeting ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                   </div>
-                  
                   {isMeeting && (
                     <div className="animate-fadeIn">
                         <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">Horário da Reunião</label>
-                        <input 
-                            type="time" 
-                            required={isMeeting}
-                            value={meetingTime} 
-                            onChange={e => setMeetingTime(e.target.value)} 
-                            className={inputClass} 
-                        />
+                        <input type="time" required={isMeeting} value={meetingTime} onChange={e => setMeetingTime(e.target.value)} className={inputClass} />
                     </div>
                   )}
               </div>
-
-              <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={isSubmitting} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2">
                 {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : null}
                 {isSubmitting ? 'Processando...' : 'Adicionar'}
               </button>
@@ -281,8 +182,6 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
         </div>
 
         <div className="lg:col-span-2 space-y-6 relative">
-          
-          {/* UNDO TOAST NOTIFICATION */}
           {undoTask && (
             <div className="absolute top-0 right-0 z-20 animate-fadeInLeft w-full max-w-sm">
                 <div className="bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between gap-4">
@@ -291,27 +190,8 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
                         <span className="text-sm font-medium">Tarefa excluída</span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button 
-                            onClick={handleUndo}
-                            className="flex items-center gap-1.5 text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors bg-slate-700/50 px-2 py-1 rounded"
-                        >
-                            <Undo2 size={14} />
-                            Desfazer
-                        </button>
-                        <button 
-                            onClick={() => {
-                            if (undoTimer) clearTimeout(undoTimer);
-                            if (undoTask) onDeleteTask(undoTask.id);
-                            setUndoTask(null);
-                            }}
-                            className="text-slate-400 hover:text-white transition-colors"
-                        >
-                            <X size={16} />
-                        </button>
+                        <button onClick={handleUndo} className="flex items-center gap-1.5 text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors bg-slate-700/50 px-2 py-1 rounded"><Undo2 size={14} />Desfazer</button>
                     </div>
-                </div>
-                <div className="h-1 bg-slate-700 rounded-b-lg overflow-hidden mt-[-4px] mx-1">
-                    <div className="h-full bg-blue-500 animate-progressBar" style={{animationDuration: '5s'}}></div>
                 </div>
             </div>
           )}
@@ -322,39 +202,25 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
             return (
               <div key={group} className="space-y-3">
                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-md text-sm font-bold ${getGroupColor(group)}`}>
-                  {group === 'Atrasadas' && <AlertCircle size={14} />}{group === 'Hoje' && <Calendar size={14} />}{group === 'Futuras' && <Clock size={14} />}
                   <span>{group}</span><span className="opacity-60 text-xs ml-1">({groupTasks.length})</span>
                 </div>
                 <div className="space-y-2">
                     {groupTasks.map(task => {
                         const projectName = getProjectName(task.projectId);
-                        const isMeetingTask = task.isMeeting;
-                        
                         return (
                         <div key={task.id} className={`bg-white p-4 rounded-xl border flex items-start gap-4 group hover:shadow-md transition-all ${task.isCompleted ? 'border-slate-100 opacity-60' : 'border-slate-200'} relative`}>
-                            <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : (isMeetingTask ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-300 hover:border-blue-500')}`}>
-                                {task.isCompleted ? <Check size={14} strokeWidth={3} /> : (isMeetingTask ? <Video size={12} /> : null)}
+                            <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : (task.isMeeting ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-300 hover:border-blue-500')}`}>
+                                {task.isCompleted ? <Check size={14} strokeWidth={3} /> : (task.isMeeting ? <Video size={12} /> : null)}
                             </button>
-                            
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <p className={`text-slate-800 font-medium break-words ${task.isCompleted ? 'line-through text-slate-400' : ''}`}>{task.title}</p>
-                                        {isMeetingTask && !task.isCompleted && task.meetingTime && (
-                                            <div className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                                <Clock size={10} />
-                                                Reunião às {task.meetingTime}
-                                            </div>
+                                        {task.isMeeting && !task.isCompleted && task.meetingTime && (
+                                            <div className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100"><Clock size={10} />Reunião às {task.meetingTime}</div>
                                         )}
                                     </div>
-                                    
-                                    <button 
-                                        type="button"
-                                        onClick={(e) => handleTaskDeleteRequest(e, task)}
-                                        className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
+                                    <button type="button" onClick={(e) => handleTaskDeleteRequest(e, task)} className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors"><Trash2 size={18} /></button>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mt-2">
                                     {task.dueDate && <span className={`text-xs flex items-center gap-1 ${getTaskGroup(task) === 'Atrasadas' ? 'text-red-600 font-medium' : 'text-slate-500'}`}><Calendar size={12} />{new Date(task.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
@@ -368,67 +234,12 @@ const Tasks: React.FC<TasksProps> = ({ tasks, projects, onAddTask, onToggleTask,
               </div>
             );
           })}
-          {displayedTasks.length === 0 && (<div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">Nenhuma tarefa pendente.</div>)}
         </div>
       </div>
-
-      {meetingToDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4" onClick={() => setMeetingToDelete(null)}>
-           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fadeIn overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="p-6 bg-red-50 border-b border-red-100 flex items-start gap-4">
-                <div className="p-2 bg-red-100 rounded-full text-red-600">
-                  <CalendarX size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-red-900">Excluir Reunião</h3>
-                  <p className="text-sm text-red-700 mt-1">
-                    Esta é uma reunião agendada.
-                  </p>
-                </div>
-                <button onClick={() => setMeetingToDelete(null)} className="ml-auto text-red-400 hover:text-red-700"><X size={20} /></button>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                <p className="text-slate-700">
-                  Deseja excluí-la também da sua <span className="font-bold">Agenda do Google</span>?
-                </p>
-                
-                <div className="flex flex-col gap-2 pt-2">
-                  <button 
-                    onClick={confirmMeetingDelete}
-                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    Sim, excluir de tudo
-                  </button>
-                  <button 
-                    onClick={() => { onDeleteTask(meetingToDelete.id); setMeetingToDelete(null); }}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-all"
-                  >
-                    Apenas do CGest (Manter no Google)
-                  </button>
-                  <button 
-                    onClick={() => setMeetingToDelete(null)} 
-                    className="w-full px-4 py-2 text-slate-500 hover:text-slate-800 text-sm mt-2"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-           </div>
-        </div>
-      )}
       
       <style>{`
-        @keyframes fadeInLeft {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes progressBar {
-            from { width: 100%; }
-            to { width: 0%; }
-        }
+        @keyframes fadeInLeft { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fadeInLeft { animation: fadeInLeft 0.3s ease-out; }
-        .animate-progressBar { animation: progressBar 5s linear forwards; }
       `}</style>
     </div>
   );

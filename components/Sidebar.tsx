@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Briefcase, LogOut, X, Target, CheckSquare, UserCircle, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, LogOut, X, Target, CheckSquare, UserCircle, Search } from 'lucide-react';
 import { User } from '../types';
 
 interface SidebarProps {
@@ -17,7 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'projects', label: 'Projetos', icon: Briefcase },
-    { id: 'agenda', label: 'Agenda', icon: Calendar },
+    { id: 'prospects', label: 'Prospecção', icon: Search },
     { id: 'goals', label: 'Metas', icon: Target },
     { id: 'tasks', label: 'Tarefas', icon: CheckSquare },
     { id: 'profile', label: 'Meu Perfil', icon: UserCircle },
@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
               </button>
             </div>
 
-            {/* MENU ITEMS (Scrollable Area) */}
+            {/* MENU ITEMS */}
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
               {menuItems.map((item) => (
                 <button
@@ -82,10 +82,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
             </nav>
         </div>
 
-        {/* USER PROFILE FOOTER (Fixed at Bottom) */}
+        {/* USER PROFILE FOOTER */}
         <div className="p-4 border-t border-white/10 flex-shrink-0">
           <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-lg">
-            {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden shrink-0 relative">
                 {user?.avatar ? (
                     <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -93,13 +92,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, user, onLogo
                     <UserCircle size={32} className="text-white/80" />
                 )}
             </div>
-            
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user?.name || 'Usuário'}</p>
               <p className="text-xs text-white/70 truncate">{user?.email}</p>
             </div>
           </div>
-          
           <button
             onClick={onLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-white/80 hover:bg-white/10 hover:text-white rounded-lg transition-colors text-sm font-medium"

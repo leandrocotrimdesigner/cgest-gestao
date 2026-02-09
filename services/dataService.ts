@@ -1,5 +1,5 @@
 
-import { Client, Project, User, Goal, Task, Payment, PaymentStatus } from '../types';
+import { Client, Project, User, Goal, Task, Payment, PaymentStatus, Prospect } from '../types';
 import { db, auth, googleProvider, isConfigured } from './firebaseClient';
 import { 
     collection, 
@@ -40,6 +40,7 @@ class DataService {
     if (!localStorage.getItem('cgest_goals')) localStorage.setItem('cgest_goals', '[]');
     if (!localStorage.getItem('cgest_tasks')) localStorage.setItem('cgest_tasks', '[]');
     if (!localStorage.getItem('cgest_payments')) localStorage.setItem('cgest_payments', '[]');
+    if (!localStorage.getItem('cgest_prospects')) localStorage.setItem('cgest_prospects', '[]');
   }
 
   // --- HELPERS ---
@@ -54,7 +55,7 @@ class DataService {
       return uid;
   }
 
-  // --- CLIENTS (Firestore Collection: clients) ---
+  // --- CLIENTS ---
   
   async getClients(): Promise<Client[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_clients') || '[]');
@@ -86,7 +87,7 @@ class DataService {
         dueDay: client.dueDay || null,
         driveFolderUrl: client.driveFolderUrl || '',
         createdAt: now,
-        userId: userId // VÍNCULO OBRIGATÓRIO
+        userId: userId
     };
 
     if (this.useMock) {
@@ -112,8 +113,6 @@ class DataService {
           localStorage.setItem('cgest_clients', JSON.stringify(updated));
           return;
        }
-       
-       // Não precisamos reenviar o userId no update se as regras permitirem isOwner
        await updateDoc(doc(db, 'clients', client.id), { ...client });
   }
 
@@ -126,7 +125,7 @@ class DataService {
     await deleteDoc(doc(db, 'clients', id));
   }
 
-  // --- PROJECTS (Firestore Collection: projects) ---
+  // --- PROJECTS ---
   
   async getProjects(): Promise<Project[]> {
     if (this.useMock) return JSON.parse(localStorage.getItem('cgest_projects') || '[]');
@@ -139,12 +138,14 @@ class DataService {
 
   async addProject(project: any): Promise<Project> {
       const userId = this.getCurrentUserId();
-      const payload = { 
+      const payload: any = { 
           ...project, 
           userId, 
           createdAt: new Date().toISOString() 
       };
       
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
       if (this.useMock) {
          const newP = { ...payload, id: generateId() };
          const list = JSON.parse(localStorage.getItem('cgest_projects') || '[]');
@@ -185,7 +186,7 @@ class DataService {
       }
   }
 
-  // --- GOALS (Firestore Collection: goals) ---
+  // --- GOALS ---
   
   async getGoals(): Promise<Goal[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_goals') || '[]');
@@ -199,7 +200,6 @@ class DataService {
   async addGoal(goal: any): Promise<void> {
       const userId = this.getCurrentUserId();
       const payload = { ...goal, userId };
-      
       if (!this.useMock) {
           await addDoc(collection(db, 'goals'), payload);
       } else {
@@ -226,7 +226,7 @@ class DataService {
       }
   }
 
-  // --- TASKS (Firestore Collection: tasks) ---
+  // --- TASKS ---
   
   async getTasks(): Promise<Task[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
@@ -238,20 +238,23 @@ class DataService {
   }
   
   async addTask(task: any): Promise<void> {
-  const userId = this.getCurrentUserId(); 
-  const payload = {
-    ...task,
-    projectId: task.projectId || 'geral',
-    meetingTime: task.meetingTime || new Date().toISOString(),
-    googleEventId: task.googleEventId || '',
-    userId,
-    createdAt: new Date().toISOString()
-  };
+    const userId = this.getCurrentUserId();
+    const payload: any = { 
+        ...task, 
+        userId, 
+        createdAt: new Date().toISOString() 
+    };
+    
+    // Remove campos que eram exclusivos da agenda
+    delete payload.googleEventId;
 
-  // ... o resto do código continua igual
+    Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined) {
+            delete payload[key];
+        }
+    });
 
-  if (this.useMock) {
-    // ... o resto do código do mock continua igual aqui embaixo
+    if (this.useMock) {
         const list = JSON.parse(localStorage.getItem('cgest_tasks') || '[]');
         localStorage.setItem('cgest_tasks', JSON.stringify([...list, { ...payload, id: generateId() }]));
         return;
@@ -284,7 +287,7 @@ class DataService {
       }
   }
 
-  // --- PAYMENTS (Firestore Collection: payments) ---
+  // --- PAYMENTS ---
   
   async getPayments(): Promise<Payment[]> {
       if (this.useMock) return JSON.parse(localStorage.getItem('cgest_payments') || '[]');
@@ -298,7 +301,6 @@ class DataService {
   async addPayment(payment: any): Promise<void> {
       const userId = this.getCurrentUserId();
       const payload = { ...payment, userId };
-      
       if(!this.useMock) {
           await addDoc(collection(db, 'payments'), payload);
       } else {
@@ -317,14 +319,65 @@ class DataService {
       }
   }
 
-  // --- AUTH (Google Only) ---
+  // --- PROSPECTS (PROSPECÇÃO) ---
+  
+  async getProspects(): Promise<Prospect[]> {
+    if (this.useMock) return JSON.parse(localStorage.getItem('cgest_prospects') || '[]');
+    try {
+        const q = query(collection(db, 'prospects'), where("userId", "==", this.getCurrentUserId()));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Prospect[];
+    } catch { return []; }
+  }
+
+  async addProspect(prospect: Omit<Prospect, 'id' | 'createdAt'>): Promise<Prospect> {
+    const userId = this.getCurrentUserId();
+    const payload = { 
+        ...prospect, 
+        userId, 
+        createdAt: new Date().toISOString() 
+    };
+    
+    // Remove undefined
+    Object.keys(payload).forEach(key => (payload as any)[key] === undefined && delete (payload as any)[key]);
+
+    if (this.useMock) {
+        const newP = { ...payload, id: generateId() };
+        const list = JSON.parse(localStorage.getItem('cgest_prospects') || '[]');
+        localStorage.setItem('cgest_prospects', JSON.stringify([...list, newP]));
+        return newP as Prospect;
+    }
+    
+    const docRef = await addDoc(collection(db, 'prospects'), payload);
+    return { id: docRef.id, ...payload } as Prospect;
+  }
+
+  async updateProspect(prospect: Prospect): Promise<void> {
+    if (this.useMock) {
+        const list = JSON.parse(localStorage.getItem('cgest_prospects') || '[]');
+        const updated = list.map((p: Prospect) => p.id === prospect.id ? prospect : p);
+        localStorage.setItem('cgest_prospects', JSON.stringify(updated));
+        return;
+    }
+    await updateDoc(doc(db, 'prospects', prospect.id), { ...prospect });
+  }
+
+  async deleteProspect(id: string): Promise<void> {
+    if (this.useMock) {
+        const list = JSON.parse(localStorage.getItem('cgest_prospects') || '[]');
+        localStorage.setItem('cgest_prospects', JSON.stringify(list.filter((p: Prospect) => p.id !== id)));
+        return;
+    }
+    await deleteDoc(doc(db, 'prospects', id));
+  }
+
+  // --- AUTH ---
   
   async loginWithGoogle(): Promise<User> {
       if (this.useMock) {
           return { id: FALLBACK_USER_ID, email: 'mock@cgest.com', name: 'Usuário Local' };
       }
       try {
-          console.log("Iniciando signInWithPopup para:", window.location.hostname);
           const result = await signInWithPopup(auth, googleProvider);
           const u = result.user;
           return { 
@@ -335,10 +388,6 @@ class DataService {
           };
       } catch (error: any) {
           console.error("Erro no login Google:", error);
-          if (error.code === 'auth/unauthorized-domain') {
-              console.error("DOMÍNIO NÃO AUTORIZADO! Adicione este domínio no Firebase Console -> Auth -> Settings.");
-              alert("Domínio não autorizado. Verifique o console do navegador para mais detalhes.");
-          }
           throw error;
       }
   }
@@ -350,7 +399,6 @@ class DataService {
 
   async getCurrentUser(): Promise<User | null> {
       if (this.useMock) return { id: FALLBACK_USER_ID, email: 'admin@local.com', name: 'Admin Local' };
-      
       return new Promise((resolve) => {
           if (!auth) { resolve(null); return; }
           const unsubscribe = auth.onAuthStateChanged((u: any) => {
@@ -372,7 +420,7 @@ class DataService {
       return user;
   }
 
-  // --- BACKUP & RESTORE ---
+  // --- BACKUP ---
   
   async getBackupData(): Promise<any> {
     const clients = await this.getClients();
@@ -380,27 +428,18 @@ class DataService {
     const tasks = await this.getTasks();
     const payments = await this.getPayments();
     const goals = await this.getGoals();
+    const prospects = await this.getProspects();
 
-    return {
-        clients,
-        projects,
-        tasks,
-        payments,
-        goals,
-        timestamp: new Date().toISOString()
-    };
+    return { clients, projects, tasks, payments, goals, prospects, timestamp: new Date().toISOString() };
   }
 
   async restoreBackupData(backup: any): Promise<void> {
-    if (!this.useMock) {
-        console.warn("Restauração não disponível diretamente no Firebase por segurança.");
-        return;
-    }
-    
+    if (!this.useMock) return;
     if (backup.clients) localStorage.setItem('cgest_clients', JSON.stringify(backup.clients));
     if (backup.projects) localStorage.setItem('cgest_projects', JSON.stringify(backup.projects));
     if (backup.tasks) localStorage.setItem('cgest_tasks', JSON.stringify(backup.tasks));
     if (backup.payments) localStorage.setItem('cgest_payments', JSON.stringify(backup.payments));
+    if (backup.prospects) localStorage.setItem('cgest_prospects', JSON.stringify(backup.prospects));
   }
 }
 
