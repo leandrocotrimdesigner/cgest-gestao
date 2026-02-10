@@ -319,6 +319,15 @@ class DataService {
       }
   }
 
+  async deletePayment(id: string): Promise<void> {
+      if(!this.useMock) {
+          await deleteDoc(doc(db, 'payments', id));
+      } else {
+          const list = JSON.parse(localStorage.getItem('cgest_payments') || '[]');
+          localStorage.setItem('cgest_payments', JSON.stringify(list.filter((p: Payment) => p.id !== id)));
+      }
+  }
+
   // --- PROSPECTS (PROSPECÇÃO) ---
   
   async getProspects(): Promise<Prospect[]> {

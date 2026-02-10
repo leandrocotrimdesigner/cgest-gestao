@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Client, Project, Goal, Task, Payment } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock } from 'lucide-react';
+import { DollarSign, Briefcase, Users, TrendingUp, Quote, Trash2, Check, AlertTriangle, X, Calendar, CheckSquare, FileText, ArrowRight, List, Video, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import Goals from './Goals'; 
 
 interface DashboardProps {
@@ -40,6 +40,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
   const [alertToDelete, setAlertToDelete] = useState<string | null>(null);
 
+  // Filtro Temporal
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   // Revenue Details State
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -50,58 +53,153 @@ const Dashboard: React.FC<DashboardProps> = ({
     setTodaysVerse(VERSES[index]);
   }, []);
 
+  // Helpers robustos para extrair ano e mês dos pagamentos
+  const getPaymentYear = (p: any) => {
+      if (p.year !== undefined) return p.year;
+      if (p.dueDate || p.paidAt) {
+          const parsed = parseInt((p.dueDate || p.paidAt).split('-')[0], 10);
+          return isNaN(parsed) ? 2025 : parsed; // Fallback para 2025 conforme solicitado para registros legados
+      }
+      return 2025;
+  };
+
+  const getPaymentMonth = (p: any) => {
+      if (p.month !== undefined) return p.month;
+      if (p.dueDate || p.paidAt) {
+          return parseInt((p.dueDate || p.paidAt).split('-')[1], 10) - 1;
+      }
+      return new Date().getMonth();
+  };
+
   const stats = useMemo(() => {
     const safeClients = clients || [];
     const safeProjects = projects || [];
+    const safePayments = payments || [];
 
     const activeClients = safeClients.filter(c => c.status === 'active');
     const totalClients = activeClients.length;
     const activeProjects = safeProjects.filter(p => p.status === 'in_progress').length;
     
-    const mrr = activeClients.filter(c => c.type === 'mensalista').reduce((acc, curr) => acc + (curr.monthlyValue || 0), 0);
+    const currentMonth = new Date().getMonth();
+
+    // Faturamento Mensal: Aplica filtro duplo (Mês Atual + Ano Selecionado)
+    const monthlyRevenue = safePayments
+        .filter(p => p.status === 'paid')
+        .filter(p => getPaymentYear(p) === selectedYear && getPaymentMonth(p) === currentMonth)
+        .reduce((sum, p) => sum + p.value, 0)
+        + safeProjects
+        .filter(p => p.paymentStatus === 'paid')
+        .filter(p => {
+            if (!p.paidAt) return false;
+            return getPaymentYear(p) === selectedYear && getPaymentMonth(p) === currentMonth;
+        })
+        .reduce((sum, p) => sum + p.budget, 0);
+
+    // Faturamento Total: Histórico completo (Ignora filtros de ano/mês)
+    const totalRevenue = safePayments
+        .filter(p => p.status === 'paid')
+        .reduce((sum, p) => sum + p.value, 0)
+        + safeProjects
+        .filter(p => p.paymentStatus === 'paid')
+        .reduce((sum, p) => sum + p.budget, 0);
+
     const pipeline = safeProjects.filter(p => p.paymentStatus === 'pending').reduce((acc, curr) => acc + curr.budget, 0);
-    const projectRevenue = safeProjects.filter(p => p.paymentStatus === 'paid').reduce((acc, curr) => acc + curr.budget, 0);
 
-    return { totalClients, activeProjects, mrr, pipeline, projectRevenue };
-  }, [clients, projects]);
+    return { totalClients, activeProjects, monthlyRevenue, totalRevenue, pipeline };
+  }, [clients, projects, payments, selectedYear]);
 
-  const weeklyRevenueData = useMemo(() => {
+  // Gráfico Anual de Receita (Filtrado estritamente pelo selectedYear)
+  const yearlyRevenueData = useMemo(() => {
      const data = [];
-     const today = new Date();
      const safePayments = payments || [];
      const safeProjects = projects || [];
+     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-     for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        const dayStr = d.toISOString().split('T')[0];
+     for (let i = 0; i < 12; i++) {
+        const monthPrefix = `${selectedYear}-${String(i + 1).padStart(2, '0')}`;
         
-        const dailyPayments = safePayments.filter(p => p.status === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.value, 0);
-        const dailyProjects = safeProjects.filter(p => p.paymentStatus === 'paid' && p.paidAt === dayStr).reduce((acc, curr) => acc + curr.budget, 0);
+        const monthlyPayments = safePayments.filter(p => {
+            if (p.status !== 'paid') return false;
+            return getPaymentYear(p) === selectedYear && getPaymentMonth(p) === i;
+        }).reduce((acc, curr) => acc + curr.value, 0);
+
+        const monthlyProjects = safeProjects.filter(p => {
+            if (p.paymentStatus !== 'paid' || !p.paidAt) return false;
+            return getPaymentYear(p) === selectedYear && getPaymentMonth(p) === i;
+        }).reduce((acc, curr) => acc + curr.budget, 0);
 
         data.push({ 
-            name: d.toLocaleDateString('pt-BR', { weekday: 'short' }), 
-            date: dayStr, 
-            revenue: dailyPayments + dailyProjects 
+            name: months[i], 
+            date: monthPrefix, 
+            revenue: monthlyPayments + monthlyProjects 
         });
      }
      return data;
-  }, [payments, projects]);
+  }, [payments, projects, selectedYear]);
 
-  const overduePayments = useMemo(() => {
+  const getClientName = (id: string) => (clients || []).find(c => c.id === id)?.name || 'Cliente';
+  const getProjectName = (id?: string) => (projects || []).find(p => p.id === id)?.name;
+
+  const alertsList = useMemo(() => {
       const todayStr = new Date().toISOString().split('T')[0];
-      return (payments || [])
-        .filter(p => p.status === 'pending' && p.dueDate < todayStr)
-        .filter(p => !hiddenAlerts.has(p.id));
-  }, [payments, hiddenAlerts]);
+      const currentMonth = new Date().getMonth();
+      const alerts: Array<{
+          id: string;
+          type: 'payment' | 'project';
+          title: string;
+          subtitle: string;
+          date: string | null;
+          value: number;
+      }> = [];
+
+      // Pagamentos Atrasados (Filtro Duplo: Ano Selecionado e Mês Atual)
+      (payments || []).forEach(p => {
+          if (p.status === 'pending' && p.dueDate < todayStr && !hiddenAlerts.has(p.id)) {
+              if (getPaymentYear(p) === selectedYear && getPaymentMonth(p) === currentMonth) {
+                  alerts.push({
+                      id: p.id,
+                      type: 'payment',
+                      title: getClientName(p.clientId),
+                      subtitle: p.description || 'Pagamento Pendente',
+                      date: p.dueDate,
+                      value: p.value
+                  });
+              }
+          }
+      });
+
+      // Projetos Pendentes
+      (projects || []).forEach(p => {
+          if (p.paymentStatus === 'pending' && !hiddenAlerts.has(`proj-${p.id}`)) {
+              const pYear = p.deadline ? parseInt(p.deadline.split('-')[0], 10) : 2025;
+              const pMonth = p.deadline ? parseInt(p.deadline.split('-')[1], 10) - 1 : currentMonth;
+              
+              if (!p.deadline || (pYear === selectedYear && pMonth === currentMonth)) {
+                  alerts.push({
+                      id: `proj-${p.id}`,
+                      type: 'project',
+                      title: getClientName(p.clientId),
+                      subtitle: `Projeto: ${p.name}`,
+                      date: p.deadline || null,
+                      value: p.budget
+                  });
+              }
+          }
+      });
+
+      alerts.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+
+      return alerts;
+  }, [payments, projects, hiddenAlerts, clients, selectedYear]);
 
   const todaysTasks = useMemo(() => {
       const todayStr = new Date().toISOString().split('T')[0];
       return (tasks || []).filter(t => t.dueDate === todayStr);
   }, [tasks]);
-
-  const getClientName = (id: string) => (clients || []).find(c => c.id === id)?.name || 'Cliente';
-  const getProjectName = (id?: string) => (projects || []).find(p => p.id === id)?.name;
 
   const handleDeleteAlertRequest = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -127,8 +225,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const openRecentDetails = () => {
-    const lastDayWithRevenue = [...weeklyRevenueData].reverse().find(d => d.revenue > 0);
-    const targetDate = lastDayWithRevenue ? lastDayWithRevenue.date : new Date().toISOString().split('T')[0];
+    const lastMonthWithRevenue = [...yearlyRevenueData].reverse().find(d => d.revenue > 0);
+    const targetDate = lastMonthWithRevenue ? lastMonthWithRevenue.date : `${selectedYear}-01`;
     setSelectedDate(targetDate);
     setIsDetailsOpen(true);
   };
@@ -137,15 +235,23 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (!selectedDate) return [];
     const transactionList: Array<{ id: string; type: 'Receita' | 'Projeto'; clientName: string; description: string; value: number; date: string }> = [];
 
+    const [targetYearStr, targetMonthStr] = selectedDate.split('-');
+    const targetYear = parseInt(targetYearStr);
+    const targetMonth = parseInt(targetMonthStr) - 1;
+
     (payments || []).forEach(p => {
-        if (p.status === 'paid' && p.paidAt === selectedDate) {
-            transactionList.push({ id: p.id, type: 'Receita', clientName: getClientName(p.clientId), description: p.description || 'Mensalidade/Avulso', value: p.value, date: p.paidAt });
+        if (p.status === 'paid') {
+            if (getPaymentYear(p) === targetYear && getPaymentMonth(p) === targetMonth) {
+                transactionList.push({ id: p.id, type: 'Receita', clientName: getClientName(p.clientId), description: p.description || 'Mensalidade/Avulso', value: p.value, date: p.paidAt || p.dueDate });
+            }
         }
     });
 
     (projects || []).forEach(p => {
-        if (p.paymentStatus === 'paid' && p.paidAt === selectedDate) {
-            transactionList.push({ id: p.id, type: 'Projeto', clientName: getClientName(p.clientId), description: `Projeto: ${p.name}`, value: p.budget, date: p.paidAt });
+        if (p.paymentStatus === 'paid' && p.paidAt) {
+            if (getPaymentYear(p) === targetYear && getPaymentMonth(p) === targetMonth) {
+                transactionList.push({ id: p.id, type: 'Projeto', clientName: getClientName(p.clientId), description: `Projeto: ${p.name}`, value: p.budget, date: p.paidAt });
+            }
         }
     });
 
@@ -156,7 +262,31 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn pb-8">
-      {/* 1. Inspiração do Dia */}
+      {/* 1. Header & Seletor de Ano */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+              <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
+              <p className="text-slate-500">Acompanhe seus resultados e métricas</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm">
+              <button 
+                  onClick={() => setSelectedYear(prev => Math.max(2025, prev - 1))} 
+                  disabled={selectedYear <= 2025}
+                  className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              >
+                  <ChevronLeft size={18} />
+              </button>
+              <span className="font-bold text-slate-700 min-w-[50px] text-center">{selectedYear}</span>
+              <button 
+                  onClick={() => setSelectedYear(prev => prev + 1)} 
+                  className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100 transition-all"
+              >
+                  <ChevronRight size={18} />
+              </button>
+          </div>
+      </div>
+
+      {/* 2. Inspiração do Dia */}
       <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
@@ -170,26 +300,26 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. Métrica Cards */}
+      {/* 3. Métrica Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="MRR Mensal (Mensalistas)" value={formatCurrency(stats.mrr)} icon={DollarSign} color="text-green-600" bg="bg-green-100"/>
-        <StatCard title="Projetos Pagos (Total)" value={formatCurrency(stats.projectRevenue)} icon={Check} color="text-emerald-600" bg="bg-emerald-100"/>
+        <StatCard title={`Faturamento Mensal (${selectedYear})`} value={formatCurrency(stats.monthlyRevenue)} icon={DollarSign} color="text-green-600" bg="bg-green-100"/>
+        <StatCard title="Faturamento Total" value={formatCurrency(stats.totalRevenue)} icon={Check} color="text-emerald-600" bg="bg-emerald-100"/>
         <StatCard title="Pipeline (Pendente)" value={formatCurrency(stats.pipeline)} icon={TrendingUp} color="text-blue-600" bg="bg-blue-100"/>
         <StatCard title="Projetos Ativos" value={stats.activeProjects} icon={Briefcase} color="text-purple-600" bg="bg-purple-100"/>
       </div>
 
-      {/* 3. CENTRAL GRID */}
+      {/* 4. CENTRAL GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Receita Chart */}
+        {/* Receita Chart Anual */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2"><DollarSign size={20} className="text-green-600"/>Receita (7 Dias)</h3>
+                <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2"><DollarSign size={20} className="text-green-600"/>Receita Anual ({selectedYear})</h3>
                 <button onClick={openRecentDetails} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors"><List size={18} /></button>
             </div>
             <div className="flex-1 w-full min-h-0 relative group">
                 <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <BarChart data={weeklyRevenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleBarClick} className="cursor-pointer">
+                    <BarChart data={yearlyRevenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={handleBarClick} className="cursor-pointer">
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="name" tick={{fill: '#64748b', fontSize: 10}} axisLine={false} tickLine={false} />
                         <YAxis tickFormatter={(val) => `R$${val}`} tick={{fill: '#64748b', fontSize: 10}} axisLine={false} tickLine={false} />
@@ -202,22 +332,24 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Alertas Financeiros */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[400px]">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><AlertTriangle size={20} className="text-red-500"/>Alertas</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"><AlertTriangle size={20} className="text-red-500"/>Alertas Financeiros</h3>
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
-                {overduePayments.length > 0 ? (
-                    overduePayments.map(payment => (
-                        <div key={payment.id} className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3 relative group">
-                            <div className="bg-white p-1.5 rounded-full text-red-500 shadow-sm shrink-0"><DollarSign size={14} /></div>
+                {alertsList.length > 0 ? (
+                    alertsList.map(alert => (
+                        <div key={alert.id} className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3 relative group">
+                            <div className="bg-white p-1.5 rounded-full text-red-500 shadow-sm shrink-0">
+                                {alert.type === 'project' ? <Briefcase size={14} /> : <DollarSign size={14} />}
+                            </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-800 truncate">{getClientName(payment.clientId)}</p>
-                                <p className="text-xs text-red-600 font-medium truncate">{payment.description || 'Pendente'}</p>
+                                <p className="text-sm font-bold text-slate-800 truncate">{alert.title}</p>
+                                <p className="text-xs text-red-600 font-medium truncate">{alert.subtitle}</p>
                                 <div className="flex justify-between mt-1 text-xs text-slate-500">
-                                    <span>{new Date(payment.dueDate).toLocaleDateString('pt-BR')}</span>
-                                    <span className="font-bold text-red-700">{formatCurrency(payment.value)}</span>
+                                    <span>{alert.date ? new Date(alert.date + 'T00:00:00').toLocaleDateString('pt-BR') : 'Sem prazo'}</span>
+                                    <span className="font-bold text-red-700">{formatCurrency(alert.value)}</span>
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button type="button" onClick={(e) => handleDeleteAlertRequest(e, payment.id)} className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100">
+                                <button type="button" onClick={(e) => handleDeleteAlertRequest(e, alert.id)} className="text-red-400 bg-white hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md shadow-sm transition-colors border border-red-100">
                                     <Trash2 size={14} />
                                 </button>
                             </div>
@@ -226,7 +358,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm border-2 border-dashed border-slate-100 rounded-lg p-4 text-center">
                         <Check size={24} className="mb-2 opacity-50 text-green-500"/>
-                        <p>Tudo em dia!</p>
+                        <p>Nenhum alerta pendente!</p>
                     </div>
                 )}
             </div>
@@ -241,7 +373,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const projectName = getProjectName(task.projectId);
                         return (
                             <div key={task.id} className={`p-3 border rounded-lg flex items-start gap-3 transition-all ${task.isCompleted ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-blue-400'}`}>
-                                <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}>
+                                <button onClick={() => onToggleTask(task.id, !task.isCompleted)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-green-50 border-green-500 text-white' : 'bg-white border-slate-300 hover:border-blue-500'}`}>
                                     {task.isCompleted && <Check size={12} strokeWidth={3} />}
                                 </button>
                                 <div className="min-w-0 flex-1">
@@ -271,7 +403,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. METAS */}
+      {/* 5. METAS */}
       <div className="pt-4 border-t border-slate-200">
         <Goals goals={goals || []} onAddGoal={onAddGoal} onDeleteGoal={onDeleteGoal} onUpdateGoal={onUpdateGoal} readOnly={true} />
       </div>
@@ -283,7 +415,12 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                   <div>
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={20} className="text-blue-600"/> Detalhamento de Receita</h3>
-                    <p className="text-sm text-slate-500">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <p className="text-sm text-slate-500">
+                        {selectedDate.length === 7 
+                            ? new Date(selectedDate + '-01T00:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+                            : new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                        }
+                    </p>
                   </div>
                   <button onClick={() => setIsDetailsOpen(false)} className="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
               </div>
@@ -303,10 +440,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-slate-50 border-t border-slate-200"><tr><td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-700">Total do Dia:</td><td className="px-6 py-4 text-right font-bold text-slate-900 text-lg">{formatCurrency(selectedTransactions.reduce((acc, curr) => acc + curr.value, 0))}</td></tr></tfoot>
+                        <tfoot className="bg-slate-50 border-t border-slate-200"><tr><td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-700">Total do Período:</td><td className="px-6 py-4 text-right font-bold text-slate-900 text-lg">{formatCurrency(selectedTransactions.reduce((acc, curr) => acc + curr.value, 0))}</td></tr></tfoot>
                     </table>
                 ) : (
-                    <div className="p-12 text-center text-slate-400 flex flex-col items-center"><AlertTriangle size={32} className="mb-2 opacity-30" /><p>Nenhum detalhe encontrado para esta data.</p></div>
+                    <div className="p-12 text-center text-slate-400 flex flex-col items-center"><AlertTriangle size={32} className="mb-2 opacity-30" /><p>Nenhum detalhe encontrado para esta data/mês.</p></div>
                 )}
               </div>
            </div>

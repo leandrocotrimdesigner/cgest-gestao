@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Loader2, ShieldCheck, CheckCircle } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
   onLogin: () => Promise<void>;
@@ -69,15 +69,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-slate-400">Acesso Seguro</span>
               </div>
-            </div>
-
-            <div className="text-center space-y-2">
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                    <CheckCircle size={12} className="text-green-500" /> Seus dados estão protegidos
-                </div>
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                    <CheckCircle size={12} className="text-green-500" /> Integração Drive & Agenda
-                </div>
             </div>
           </div>
         </div>

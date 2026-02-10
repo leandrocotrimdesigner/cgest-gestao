@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Client, Payment } from '../types';
-import { Plus, Trash2, Search, DollarSign, CheckCircle, AlertCircle, Edit2, Loader2, FolderOpen, ExternalLink, Cloud } from 'lucide-react';
+import { Plus, Trash2, Search, DollarSign, CheckCircle, AlertCircle, Edit2, Loader2, FolderOpen, ExternalLink, Cloud, ChevronLeft, ChevronRight } from 'lucide-react';
 import { googleDriveService } from '../services/googleDriveService';
 import { useToast } from './ToastContext';
 import { BaseModal } from './BaseModal';
@@ -14,6 +14,7 @@ interface ClientsProps {
   onDeleteClient: (id: string) => Promise<void>;
   onAddPayment?: (payment: Omit<Payment, 'id'>) => Promise<void>;
   onUpdatePayment?: (payment: Payment) => Promise<void>;
+  onDeletePayment?: (id: string) => Promise<void>;
 }
 
 const Clients: React.FC<ClientsProps> = ({ 
@@ -23,13 +24,15 @@ const Clients: React.FC<ClientsProps> = ({
     onUpdateClient, 
     onDeleteClient, 
     onAddPayment, 
-    onUpdatePayment 
+    onUpdatePayment,
+    onDeletePayment
 }) => {
   const { addToast } = useToast();
   
   // Modals State
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isFinancialModalOpen, setIsFinancialModalOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
   
   // Selection State
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -38,7 +41,7 @@ const Clients: React.FC<ClientsProps> = ({
 
   // Filters & UI
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); 
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   
@@ -66,13 +69,38 @@ const Clients: React.FC<ClientsProps> = ({
       return hasOverdue ? 'overdue' : 'ok';
   };
 
+  // Filtra pagamentos utilizando os campos explícitos year/month ou fallback para a dueDate
   const getPaymentForMonth = (monthIndex: number) => {
       if (!selectedClient) return null;
       return (payments || []).find(p => {
-          const d = new Date(p.dueDate);
-          return p.clientId === selectedClient.id && d.getMonth() === monthIndex && d.getFullYear() === selectedYear;
+          const anyP = p as any;
+          const pYear = anyP.year !== undefined ? anyP.year : (p.dueDate ? parseInt(p.dueDate.split('-')[0], 10) : 2025);
+          const pMonth = anyP.month !== undefined ? anyP.month : (p.dueDate ? parseInt(p.dueDate.split('-')[1], 10) - 1 : 0);
+          return p.clientId === selectedClient.id && pMonth === monthIndex && pYear === selectedYear;
       });
   };
+
+  const getMonthStatus = (monthIndex: number) => {
+      const p = getPaymentForMonth(monthIndex);
+      if (p) return p.status;
+
+      if (!selectedClient) return 'none';
+      
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      const currentDay = today.getDate();
+      const dueDay = selectedClient.dueDay || 10;
+
+      if (selectedYear < currentYear) return 'overdue';
+      if (selectedYear === currentYear) {
+          if (monthIndex < currentMonth) return 'overdue';
+          if (monthIndex === currentMonth && currentDay > dueDay) return 'overdue';
+      }
+      return 'none'; 
+  };
+
+  const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   // --- Handlers: Client CRUD ---
   
@@ -153,6 +181,8 @@ const Clients: React.FC<ClientsProps> = ({
       e.stopPropagation();
       setSelectedClient(client);
       const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      setSelectedYear(currentYear); 
       setPaymentFormData({ 
           value: client.monthlyValue || 0, 
           description: '', 
@@ -195,21 +225,27 @@ const Clients: React.FC<ClientsProps> = ({
                 description: paymentFormData.description,
                 receiptUrl: paymentFormData.receiptUrl,
                 status: 'paid',
-                paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0]
-            });
+                paidAt: existingPayment.paidAt || new Date().toISOString().split('T')[0],
+                year: selectedYear,
+                month: monthIndex
+            } as any);
             addToast({ type: 'success', title: 'Atualizado' });
         } else {
-            const day = '10'; 
-            const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${day}`;
+            const dueDay = selectedClient.dueDay || 10;
+            const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+            const todayStr = new Date().toISOString().split('T')[0];
+
             await onAddPayment({
                 clientId: selectedClient.id,
                 value: Number(paymentFormData.value),
                 description: paymentFormData.description || `Pagamento ${months[monthIndex]}/${selectedYear}`,
-                dueDate: dateStr,
+                dueDate: dateStr, 
                 status: 'paid',
-                paidAt: dateStr,
-                receiptUrl: paymentFormData.receiptUrl
-            });
+                paidAt: todayStr,
+                receiptUrl: paymentFormData.receiptUrl,
+                year: selectedYear,
+                month: monthIndex
+            } as any);
             addToast({ type: 'success', title: 'Pagamento Criado' });
         }
       } catch (e) {
@@ -220,20 +256,49 @@ const Clients: React.FC<ClientsProps> = ({
   const handleTogglePaymentStatus = async (monthIndex: number) => {
       if (!selectedClient || !onAddPayment || !onUpdatePayment) return;
       const existingPayment = getPaymentForMonth(monthIndex);
+      
       if (existingPayment) {
-          const newStatus = existingPayment.status === 'paid' ? 'pending' : 'paid';
-          await onUpdatePayment({ ...existingPayment, status: newStatus });
+          if (existingPayment.status === 'paid') {
+              // 2º Clique: Verde -> Vermelho (Não pago / Pendente)
+              await onUpdatePayment({ 
+                  ...existingPayment, 
+                  status: 'pending',
+                  year: selectedYear,
+                  month: monthIndex 
+              } as any);
+              addToast({ type: 'info', title: 'Pagamento marcado como pendente' });
+          } else if (existingPayment.status === 'pending') {
+              // 3º Clique: Vermelho -> Abre Modal de Confirmação de Exclusão
+              setPaymentToDelete(existingPayment);
+          }
       } else {
-           // Create stub
-           const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-10`;
+           // 1º Clique (Branco ou Vermelho Automático): Registra o pagamento -> Verde (Pago)
+           const val = paymentFormData.value || selectedClient.monthlyValue || 0;
+           const desc = paymentFormData.description || `Mensalidade ${months[monthIndex]}/${selectedYear}`;
+           const dueDay = selectedClient.dueDay || 10;
+           const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+           const todayStr = new Date().toISOString().split('T')[0];
+
            await onAddPayment({
               clientId: selectedClient.id,
-              value: selectedClient.monthlyValue || 0,
-              description: `Mensalidade ${months[monthIndex]}`,
-              dueDate: dateStr,
+              value: val,
+              description: desc,
+              dueDate: dateStr, 
               status: 'paid',
-              paidAt: dateStr
-           });
+              paidAt: todayStr,
+              receiptUrl: paymentFormData.receiptUrl,
+              year: selectedYear,
+              month: monthIndex
+           } as any);
+           addToast({ type: 'success', title: 'Pagamento Registrado' });
+      }
+  };
+
+  const confirmRemovePayment = async () => {
+      if (paymentToDelete && onDeletePayment) {
+          await onDeletePayment(paymentToDelete.id);
+          addToast({ type: 'info', title: 'Registro de pagamento removido' });
+          setPaymentToDelete(null);
       }
   };
 
@@ -305,16 +370,7 @@ const Clients: React.FC<ClientsProps> = ({
         </div>
       </div>
 
-      <BaseModal isOpen={!!clientToDelete} onClose={() => setClientToDelete(null)} title="Excluir Cliente" variant="danger">
-        <div className="space-y-4">
-            <p className="text-slate-600">Confirma exclusão de <b>{clientToDelete?.name}</b>?</p>
-            <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setClientToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button onClick={confirmDeleteClient} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Confirmar Exclusão</button>
-            </div>
-        </div>
-      </BaseModal>
-
+      {/* Modal CRUD Cliente */}
       <BaseModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} title={editingClient ? 'Editar Cliente' : 'Novo Cliente'}>
         <form onSubmit={handleClientSubmit} className="space-y-4">
             <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome</label><input required type="text" value={clientFormData.name || ''} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} className={inputClass} placeholder="Nome do Cliente ou Empresa" /></div>
@@ -351,6 +407,18 @@ const Clients: React.FC<ClientsProps> = ({
         </form>
       </BaseModal>
 
+      {/* Modal Deletar Cliente */}
+      <BaseModal isOpen={!!clientToDelete} onClose={() => setClientToDelete(null)} title="Excluir Cliente" variant="danger">
+        <div className="space-y-4">
+            <p className="text-slate-600">Confirma exclusão de <b>{clientToDelete?.name}</b>?</p>
+            <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setClientToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={confirmDeleteClient} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Confirmar Exclusão</button>
+            </div>
+        </div>
+      </BaseModal>
+
+      {/* Modal Principal Financeiro */}
       <BaseModal isOpen={isFinancialModalOpen} onClose={() => setIsFinancialModalOpen(false)} title="Financeiro" maxWidth="max-w-3xl">
          <div className="space-y-6">
             <form onSubmit={handlePaymentSubmit} className="bg-slate-50 p-5 rounded-xl border border-slate-200">
@@ -358,16 +426,68 @@ const Clients: React.FC<ClientsProps> = ({
                     <input type="text" placeholder="Descrição" value={paymentFormData.description} onChange={e => setPaymentFormData({...paymentFormData, description: e.target.value})} className={inputClass} />
                     <input type="number" placeholder="Valor" value={paymentFormData.value} onChange={e => setPaymentFormData({...paymentFormData, value: parseFloat(e.target.value)})} className={inputClass} />
                 </div>
-                <div className="flex justify-end mt-4"><button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg">Registrar</button></div>
+                <div className="flex justify-end mt-4"><button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all hover:bg-blue-700">Registrar Pagamento Avulso</button></div>
             </form>
-            <div className="grid grid-cols-3 gap-2">
-                 {months.map((m, i) => {
-                     const p = getPaymentForMonth(i);
-                     return <div key={m} onClick={() => handleTogglePaymentStatus(i)} className={`p-2 border text-center cursor-pointer ${p?.status === 'paid' ? 'bg-green-100 border-green-300' : 'bg-white'}`}>{m}</div>
-                 })}
+            
+            <div>
+                {/* YEAR NAVIGATOR */}
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Ciclo Mensal</p>
+                    <div className="flex items-center gap-3 bg-slate-100 p-1 rounded-lg">
+                        <button 
+                            type="button" 
+                            onClick={() => setSelectedYear(prev => Math.max(2025, prev - 1))} 
+                            disabled={selectedYear <= 2025}
+                            className="p-1 rounded-md text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                        <span className="font-bold text-slate-700 min-w-[40px] text-center">{selectedYear}</span>
+                        <button 
+                            type="button" 
+                            onClick={() => setSelectedYear(prev => prev + 1)} 
+                            className="p-1 rounded-md text-slate-600 hover:bg-white hover:shadow-sm transition-all"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                    {months.map((m, i) => {
+                        const p = getPaymentForMonth(i);
+                        const status = getMonthStatus(i);
+                        
+                        let btnClass = 'bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600';
+                        if (status === 'paid') btnClass = 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200 shadow-sm';
+                        else if (status === 'pending') btnClass = 'bg-red-100 border-red-300 text-red-700 hover:bg-red-200 shadow-sm';
+                        else if (status === 'overdue') btnClass = 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100 shadow-sm';
+
+                        return (
+                            <div key={m} onClick={() => handleTogglePaymentStatus(i)} className={`p-2 border rounded-xl text-center cursor-pointer flex flex-col items-center justify-center min-h-[64px] transition-all ${btnClass}`}>
+                                <span className="font-bold">{m}</span>
+                                {p && <span className="text-[10px] font-medium opacity-80 mt-0.5">{formatCurrency(p.value)}</span>}
+                            </div>
+                        )
+                    })}
+                </div>
             </div>
          </div>
       </BaseModal>
+
+      {/* RENDERIZADO POR ÚLTIMO PARA GARANTIR Z-INDEX / SOBREPOSIÇÃO AO MODAL FINANCEIRO */}
+      {paymentToDelete && (
+        <BaseModal isOpen={!!paymentToDelete} onClose={() => setPaymentToDelete(null)} title="Remover Pagamento">
+            <div className="space-y-4">
+                <p className="text-slate-600">Deseja remover definitivamente este registro de pagamento?</p>
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                    <button onClick={() => setPaymentToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                    <button onClick={confirmRemovePayment} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all">Confirmar</button>
+                </div>
+            </div>
+        </BaseModal>
+      )}
+
     </div>
   );
 };

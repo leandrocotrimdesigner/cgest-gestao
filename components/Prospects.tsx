@@ -17,6 +17,7 @@ const Prospects: React.FC<ProspectsProps> = ({ prospects, onAddProspect, onUpdat
   const { addToast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProspect, setEditingProspect] = useState<Prospect | null>(null);
+  const [prospectToDelete, setProspectToDelete] = useState<Prospect | null>(null);
   const [statusFilter, setStatusFilter] = useState<ProspectStatus | 'all'>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -86,10 +87,15 @@ const Prospects: React.FC<ProspectsProps> = ({ prospects, onAddProspect, onUpdat
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Deseja excluir esta prospecção?')) {
-        await onDeleteProspect(id);
+  const handleDeleteClick = (p: Prospect) => {
+    setProspectToDelete(p);
+  };
+
+  const confirmDelete = async () => {
+    if (prospectToDelete) {
+        await onDeleteProspect(prospectToDelete.id);
         addToast({ type: 'info', title: 'Removido com sucesso' });
+        setProspectToDelete(null);
     }
   };
 
@@ -163,7 +169,7 @@ const Prospects: React.FC<ProspectsProps> = ({ prospects, onAddProspect, onUpdat
                         </span>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleOpenEdit(p)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={16}/></button>
-                            <button onClick={() => handleDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={16}/></button>
+                            <button onClick={() => handleDeleteClick(p)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={16}/></button>
                         </div>
                     </div>
 
@@ -193,6 +199,17 @@ const Prospects: React.FC<ProspectsProps> = ({ prospects, onAddProspect, onUpdat
             </div>
         )}
       </div>
+
+      {/* Modal de Exclusão */}
+      <BaseModal isOpen={!!prospectToDelete} onClose={() => setProspectToDelete(null)} title="Excluir Prospecção">
+          <div className="space-y-4">
+              <p className="text-slate-600">Deseja excluir esta prospecção?</p>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button onClick={() => setProspectToDelete(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                  <button onClick={confirmDelete} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all">Confirmar</button>
+              </div>
+          </div>
+      </BaseModal>
 
       {/* Modal de Criação/Edição */}
       <BaseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProspect ? 'Editar Lead' : 'Novo Lead'}>

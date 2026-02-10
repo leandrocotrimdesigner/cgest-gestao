@@ -138,6 +138,7 @@ function App() {
   
   const handleAddPayment = async (paymentData: any) => { await dataService.addPayment(paymentData); fetchData(); };
   const handleUpdatePayment = async (payment: Payment) => { await dataService.updatePayment(payment); fetchData(); };
+  const handleDeletePayment = async (id: string) => { await dataService.deletePayment(id); fetchData(); };
 
   const handleAddProspect = async (p: any) => { await dataService.addProspect(p); fetchData(); };
   const handleUpdateProspect = async (p: Prospect) => { await dataService.updateProspect(p); fetchData(); };
@@ -174,7 +175,7 @@ function App() {
           <main className="flex-1 p-4 md:p-8 overflow-y-auto h-full">
             <div className="max-w-7xl mx-auto">
               {activeTab === 'dashboard' && <Dashboard clients={clients} projects={projects} goals={goals} tasks={tasks} payments={payments} onAddTask={handleAddTask} onToggleTask={handleToggleTask} onAddGoal={handleAddGoal} onDeleteGoal={handleDeleteGoal} onUpdateGoal={handleUpdateGoal} />}
-              {activeTab === 'clients' && <Clients clients={clients} payments={payments} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} onAddPayment={handleAddPayment} onUpdatePayment={handleUpdatePayment} />}
+              {activeTab === 'clients' && <Clients clients={clients} payments={payments} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} onAddPayment={handleAddPayment} onUpdatePayment={handleUpdatePayment} onDeletePayment={handleDeletePayment} />}
               {activeTab === 'projects' && <Projects projects={projects} clients={clients} onAddProject={handleAddProject} onUpdateStatus={handleUpdateProjectStatus} onUpdatePaymentStatus={handleUpdateProjectPaymentStatus} onDeleteProject={handleDeleteProject} />}
               {activeTab === 'prospects' && <Prospects prospects={prospects} onAddProspect={handleAddProspect} onUpdateProspect={handleUpdateProspect} onDeleteProspect={handleDeleteProspect} />}
               {activeTab === 'goals' && <Goals goals={goals} onAddGoal={handleAddGoal} onDeleteGoal={handleDeleteGoal} onUpdateGoal={handleUpdateGoal} />}
