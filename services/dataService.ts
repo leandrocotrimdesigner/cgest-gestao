@@ -374,9 +374,7 @@ class DataService {
   // --- AUTH ---
   
   async loginWithGoogle(): Promise<User> {
-      if (this.useMock) {
-          return { id: FALLBACK_USER_ID, email: 'mock@cgest.com', name: 'Usuário Local' };
-      }
+      
       try {
           const result = await signInWithPopup(auth, googleProvider);
           const u = result.user;
@@ -398,7 +396,7 @@ class DataService {
   }
 
   async getCurrentUser(): Promise<User | null> {
-      if (this.useMock) return { id: FALLBACK_USER_ID, email: 'admin@local.com', name: 'Admin Local' };
+      
       return new Promise((resolve) => {
           if (!auth) { resolve(null); return; }
           const unsubscribe = auth.onAuthStateChanged((u: any) => {

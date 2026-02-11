@@ -1,56 +1,29 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-
-// Helper para ler variáveis de ambiente de forma segura
-const getEnv = (key: string) => {
-  return (import.meta as any).env?.[key] || '';
-};
-
-// --- CONFIGURAÇÃO DO FIREBASE (PROJETO: cgest-11430) ---
-// As chaves agora são lidas do arquivo .env.local para maior segurança e facilidade de troca.
+// Sua configuração real que você acabou de pegar
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY'), 
+  apiKey: "AIzaSyB_9TBgaAYIIQL645i0dOT5PdHpvJlIy0g",
   authDomain: "cgest-11430.firebaseapp.com",
   projectId: "cgest-11430",
   storageBucket: "cgest-11430.firebasestorage.app",
-  messagingSenderId: "399870636201",
-  appId: getEnv('VITE_FIREBASE_APP_ID'),
-  measurementId: "G-TETJFXZJ90"
+  messagingSenderId: "317063617243",
+  appId: "1:317063617243:web:fc9dba1cb44df913a54afe",
+  measurementId: "G-3EDGJ22HM5"
 };
 
-let app;
-let db: any;
-let auth: any;
-let googleProvider: GoogleAuthProvider;
-let isConfigured = false;
+// Inicializa o Firebase
+const app = initializeApp(firebaseConfig);
 
-// Verificação de segurança
-const apiKey = firebaseConfig.apiKey;
-const isKeyValid = apiKey && !apiKey.includes("COLE_A_NOVA_API_KEY");
+// Exporta os serviços para o resto do sistema usar
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
 
-try {
-    if (!isKeyValid) {
-        console.error("CRÍTICO: API Key inválida ou não configurada em .env.local");
-        console.warn("Edite o arquivo .env.local e adicione suas chaves do Firebase.");
-    } else {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        googleProvider = new GoogleAuthProvider();
-        
-        // Parâmetros para evitar problemas de popup/redirect
-        googleProvider.setCustomParameters({
-          prompt: 'select_account'
-        });
-        
-        isConfigured = true;
-        console.log("Firebase (cgest-11430) iniciado com sucesso.");
-    }
-} catch (e) {
-    console.error("Erro ao iniciar Firebase:", e);
-    isConfigured = false;
-}
+// Configuração extra para o pop-up sempre pedir para escolher a conta
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
-export { db, auth, googleProvider, isConfigured };
+export const isConfigured = true;
